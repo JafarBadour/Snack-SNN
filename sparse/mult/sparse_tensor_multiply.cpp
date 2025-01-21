@@ -3,22 +3,21 @@
 
 
 torch::Tensor sparse_multiply_cuda(
-    torch::Tensor indices1, torch::Tensor values1, 
-    torch::Tensor indices2, torch::Tensor values2, 
-    int64_t size);
+    torch::Tensor activations, torch::Tensor sparse_matrix, // 1d tensor (x, y, v)
+    int64_t sparseCols
+    );
 
-// i think here we can add N by M tensor, or N by Z where Z is a tensor by itself but it should be flattened
+
 torch::Tensor sparse_multiply(
-    torch::Tensor indices1, torch::Tensor values1, 
-    torch::Tensor indices2, torch::Tensor values2, 
-    int64_t size) {
+    torch::Tensor activations, torch::Tensor sparse_matrix,
+    int64_t sparseCols // or next layer how many neurons
+    ) {
     // regular asserts
-    TORCH_CHECK(indices1.device().is_cuda(), "Indices1 must be a CUDA tensor");
-    TORCH_CHECK(indices2.device().is_cuda(), "Indices2 must be a CUDA tensor");
-    TORCH_CHECK(values1.device().is_cuda(), "Values1 must be a CUDA tensor");
-    TORCH_CHECK(values2.device().is_cuda(), "Values2 must be a CUDA tensor");
+    TORCH_CHECK(activations.device().is_cuda(), "activations must be a CUDA tensor");
+    TORCH_CHECK(sparse_matrix.device().is_cuda(), "sparse_matrix must be a CUDA tensor");
 
-    return sparse_multiply_cuda(indices1, values1, indices2, values2, size);
+
+    return sparse_multiply_cuda(activations, sparse_matrix, sparseCols);
 }
 
 

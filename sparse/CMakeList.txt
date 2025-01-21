@@ -1,0 +1,14 @@
+cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
+project(Parallel-Dynamic-Sparse-Training)
+
+
+set(CMAKE_PREFIX_PATH "/home/jafar/Downloads/libtorch/")
+
+find_package(Torch REQUIRED)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+set(CMAKE_BUILD_TYPE "DEBUG")
+
+
+add_executable(Parallel-Dynamic-Sparse-Training mult/main.cpp)
+target_link_libraries(Parallel-Dynamic-Sparse-Training "${TORCH_LIBRARIES}")
+set_property(TARGET Parallel-Dynamic-Sparse-Training PROPERTY CXX_STANDARD 17)
