@@ -1,64 +1,113 @@
 import torch
 import os, sys
+from time import time as tic
+from time import sleep as sleep
+import random
+random.seed(0)
+start_event = torch.cuda.Event(enable_timing=True)
+end_event = torch.cuda.Event(enable_timing=True)
+def ram_info():
+    import psutil
+
+    # Get system memory usage
+    memory_info = psutil.virtual_memory()
+
+    # Total RAM in bytes
+    total_ram = memory_info.total
+
+    # RAM used in bytes
+    used_ram = memory_info.used
+
+    # RAM free in bytes
+    free_ram = memory_info.available
+
+    # Print RAM usage in human-readable format (e.g., MB)
+    print(f"Used RAM: {used_ram / 1024 ** 2:.2f} MB / {total_ram / 1024 ** 2:.2f} MB")
 
 
-sys.path.append("C:/Users/BadourJ/Arts/Parallel-Dynamic-Sparse-Training/sparse/mult")
+
+
 from sparse_tensor_multiply import sparse_multiply
 
-def convert_sparse_to_dense(sparse_tensor : torch.Tensor, indices):
-    max_sz = max(indices1) + 1
-    res = torch.zeros(max_sz, device='cuda')
-    res[indices] = sparse_tensor
-    return res
-get_diagonal = lambda siz: torch.tensor([[i,i] for i in range(siz)], dtype=torch.int64, device='cuda')
-SZ = 30000     
-indices1 = get_diagonal(SZ)
-values1 = torch.tensor(list(range(SZ)), device='cuda')
-
-indices2 = get_diagonal(SZ)
-values2 = torch.tensor(list(range(SZ)), device='cuda')
-
-import time
+activation_size = 10000
+next_layer_size = 10000
+SPARSITY_LEVEL = float(sys.argv[2])
+def return_inps():
 
 
-max_sz = max(indices1) + 1
-values_cuda_3, values_cuda_4 = convert_sparse_to_dense(values1, indices1), convert_sparse_to_dense(values2, indices2)
-values_3, values_4 = values_cuda_3.cpu(), values_cuda_4.cpu()
-t2 = time.time()
-cpu_res = values_3 * values_4
-torch.cuda.synchronize()
-t4 = time.time()
+    activations = torch.Tensor([random.random() for i in range(activation_size)])
+    W_matrix = []
+    for i in range(activation_size):
+        for j in range(next_layer_size):
 
-cpu_time = t4 - t2
-print(cpu_res.shape)
+            r = random.randint(0, 1000)
+            if r <= SPARSITY_LEVEL*10: # sparsity level
+                continue
+            W_matrix.append([i, j , random.random()])
+    W_matrix = torch.Tensor(W_matrix)
+    #W_matrix = torch.Tensor([[i, i , 1] for i in range(min(activation_size, next_layer_size))])
 
-print("=============  cpu multiplication: ", cpu_time)
+    W_matrix = W_matrix.reshape(-1)
+    return W_matrix, activations
 
+W_matrix, activations = return_inps()
+print(W_matrix.shape)
+activations = activations.to('cuda')
 
-max_sz = max(indices1) + 1
-
-values_3, values_4 = values_cuda_3, values_cuda_4
-
-
-t2 = time.time()
-cpu_res = values_3 * values_4
-torch.cuda.synchronize()
-t4 = time.time()
-print(cpu_res)  # cput out
-cuda_not_sparse_time = t4 - t2
-print(cpu_res.shape)
-
-print("============= cuda multiplication", cuda_not_sparse_time)
-
-t1 = time.time()
-output = sparse_multiply(indices1, values1, indices2, values2, max_sz)
-torch.cuda.synchronize()
-t2 = time.time()
-cuda_sparse_time = t2 - t1
-print(output.shape)
-
-print("============= time sparse cuda multiplication", cuda_sparse_time)
-
-print("cuda sparse time / cuda not sparse time ", cuda_sparse_time/ cuda_not_sparse_time)
+W_matrix = W_matrix.to('cuda')
 
 
+
+
+
+
+if sys.argv[1] == 'a':
+
+    ## doing it the old way
+    W_matrix_full = [[0.0 for _ in range(activation_size)] for __ in range(next_layer_size)]
+    for i in range(0, len(W_matrix), 3):
+        x = int(W_matrix[i])
+        y = int(W_matrix[i + 1])
+        v = W_matrix[i + 2]
+
+        W_matrix_full[x][y] = v
+    W_matrix_full = torch.Tensor(W_matrix_full).to('cuda')
+    start_event.record()
+    t1 = tic()
+    torch.cuda.synchronize()
+    multy = activations
+
+    for _ in range(500):
+        multy = torch.matmul(multy, W_matrix_full)
+        multy = multy/multy.max()
+    print(multy.sum())
+    end_event.record()
+    torch.cuda.synchronize()
+    print(ram_info())
+    print("Dense", tic() - t1)
+    elapsed_time_ms = start_event.elapsed_time(end_event)
+    print(f"Execution time: {elapsed_time_ms:.6f} ms")
+else:
+
+
+    start_event.record()
+
+    t1 = tic()
+
+    torch.cuda.synchronize()
+    res = activations
+    for _ in range(500):
+        res = sparse_multiply(res, W_matrix, next_layer_size)
+        res = res / res.max()
+
+    print(res.sum())
+    end_event.record()
+    torch.cuda.synchronize()
+
+    print(ram_info())
+    print("Sparse", tic() - t1)
+    elapsed_time_ms = start_event.elapsed_time(end_event)
+    print(f"Execution time: {elapsed_time_ms:.6f} ms")
+
+
+#assert(all(res == multy))

@@ -7,9 +7,18 @@ conda create -p ./venv2 python=3.12.7
 ```
 
 run this 
+```bash
+sudo apt install nvidia-cuda-toolkit
+
 
 ```
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+check this link to install cuda 12.6
+
+```bash
+https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=22.04&target_type=deb_local```
+```
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
 ```
 
 
@@ -18,4 +27,8 @@ set TORCH_INCLUDE=C:\Users\BadourJ\Arts\Parallel-Dynamic-Sparse-Training\venv2\L
 ```
 
 
-g++ -std=c++14 -I"C:/Users/BadourJ/Downloads/libtorch/libtorch-shared-with-deps-latest/libtorch/include" -I"C:/Users/BadourJ/Downloads/libtorch/libtorch-shared-with-deps-latest/libtorch/include/torch/csrc/api/include" \ main.cpp  -L"C:/Users/BadourJ/Downloads/libtorch/libtorch-shared-with-deps-latest/libtorch/lib"  -ltorch -lcaffe2 -o main.exe
+```
+python setup.py build
+
+python setup.py install
+```

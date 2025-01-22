@@ -11,7 +11,7 @@ __global__ void sparse_multiply_kernel(
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     
     // printf("%d - %d  \n", tid, nnz2);
-    if (tid >= nnz1) return;
+    if (tid >= nnz2) return;
     // sparse_matrix =
     /*
 
@@ -21,7 +21,8 @@ __global__ void sparse_multiply_kernel(
       meaning sparse_matrix = { X Y VALUE ...}
 
     */
-    atomicAdd(&output_values[sparse_matrix[tid+1]], activations[sparse_matrix[tid] * sparse_matrix[tid+2]);
+    tid = 3* tid;
+    atomicAdd(&output_values[(int)sparse_matrix[tid+1]], activations[(int)sparse_matrix[tid]] * sparse_matrix[tid+2]);
     
 }
 
@@ -34,7 +35,7 @@ torch::Tensor sparse_multiply_cuda(
     int nnz1 = activations.size(0);
     int nnz2 = sparse_matrix.size(0) / 3;
 
-    const int threads = 256; // this was 256
+    const int threads = 512; // this was 256
     const int blocks = (nnz2 + threads - 1) / threads;
 
     sparse_multiply_kernel<<<blocks, threads>>>(
