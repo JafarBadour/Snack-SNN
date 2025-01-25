@@ -31,6 +31,7 @@ from sparse_tensor_multiply import sparse_multiply
 
 activation_size = 10000
 next_layer_size = 10000
+REPs = 500
 SPARSITY_LEVEL = float(sys.argv[2])
 def return_inps():
 
@@ -78,7 +79,7 @@ if sys.argv[1] == 'a':
     torch.cuda.synchronize()
     multy = activations
 
-    for _ in range(1000):
+    for _ in range(REPs):
         multy = torch.matmul(multy, W_matrix_full)
         multy = multy/multy.max()
     print(multy.sum())
@@ -90,16 +91,17 @@ if sys.argv[1] == 'a':
     print(f"Execution time: {elapsed_time_ms:.6f} ms")
 else:
 
-
-    start_event.record()
     W_matrix_values = W_matrix[:, 2]
-    W_matrix_indices = W_matrix[:, :2]
+    W_matrix_indices = W_matrix[:, :2].to(torch.int32)
+    start_event.record()
+
     t1 = tic()
 
     torch.cuda.synchronize()
     res = activations
-    for _ in range(1000):
-
+    for _ in range(REPs):
+        # print(res.shape, W_matrix_values.shape, W_matrix_indices.shape)
+        # print(res.dtype, W_matrix_values.dtype, W_matrix_indices.dtype)
         res = sparse_multiply(res, W_matrix_values, W_matrix_indices, next_layer_size)
         res = res / res.max()
 
