@@ -47,7 +47,7 @@ def return_inps():
     W_matrix = torch.Tensor(W_matrix)
     #W_matrix = torch.Tensor([[i, i , 1] for i in range(min(activation_size, next_layer_size))])
 
-    W_matrix = W_matrix.reshape(-1)
+    # W_matrix = W_matrix.reshape(-1)
     return W_matrix, activations
 
 W_matrix, activations = return_inps()
@@ -65,6 +65,7 @@ if sys.argv[1] == 'a':
 
     ## doing it the old way
     W_matrix_full = [[0.0 for _ in range(activation_size)] for __ in range(next_layer_size)]
+    W_matrix=W_matrix.reshape(-1)
     for i in range(0, len(W_matrix), 3):
         x = int(W_matrix[i])
         y = int(W_matrix[i + 1])
@@ -99,7 +100,7 @@ else:
     res = activations
     for _ in range(1000):
 
-        res = sparse_multiply(res, W_matrix_values, W_matrix_indices)
+        res = sparse_multiply(res, W_matrix_values, W_matrix_indices, next_layer_size)
         res = res / res.max()
 
     print(res.sum())

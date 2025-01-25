@@ -3,13 +3,13 @@
 
 
 torch::Tensor sparse_multiply_cuda(
-    torch::Tensor activations, torch::Tensor sparse_matrix, // 1d tensor (x, y, v)
-    int64_t sparseCols
+    torch::Tensor activations, torch::Tensor sparse_matrix_values, torch::Tensor sparse_matrix_indices,
+    int64_t sparseCols // or next layer how many neurons
     );
 
 
 torch::Tensor sparse_multiply(
-    torch::Tensor activations, torch::Tensor sparse_matrix_values, torch::Tensor sparse_matrix_indices
+    torch::Tensor activations, torch::Tensor sparse_matrix_values, torch::Tensor sparse_matrix_indices,
     int64_t sparseCols // or next layer how many neurons
     ) {
     // regular asserts

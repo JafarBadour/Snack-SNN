@@ -24,14 +24,14 @@ __global__ void sparse_multiply_kernel(
     */
     tid = tid * 2;
     int x = sparse_matrix_indices[tid];
-    int y = sparse_matrix_indices[tid + 1]
+    int y = sparse_matrix_indices[tid + 1];
     atomicAdd(&output_values[x], activations[y] * sparse_matrix_values[tid]);
     
 }
 
 // Sparse tensor multiplication interface
 torch::Tensor sparse_multiply_cuda(
-    torch::Tensor activations, torch::Tensor sparse_matrix_values, torch::Tensor sparse_matrix_indices
+    torch::Tensor activations, torch::Tensor sparse_matrix_values, torch::Tensor sparse_matrix_indices,
     int64_t sparseCols) {
     auto output_values = torch::zeros({sparseCols}, torch::dtype(torch::kFloat32).device(torch::kCUDA));
     
