@@ -77,7 +77,7 @@ if sys.argv[1] == 'a':
     torch.cuda.synchronize()
     multy = activations
 
-    for _ in range(500):
+    for _ in range(1000):
         multy = torch.matmul(multy, W_matrix_full)
         multy = multy/multy.max()
     print(multy.sum())
@@ -91,13 +91,15 @@ else:
 
 
     start_event.record()
-
+    W_matrix_values = W_matrix[:, 2]
+    W_matrix_indices = W_matrix[:, :2]
     t1 = tic()
 
     torch.cuda.synchronize()
     res = activations
-    for _ in range(500):
-        res = sparse_multiply(res, W_matrix, next_layer_size)
+    for _ in range(1000):
+
+        res = sparse_multiply(res, W_matrix_values, W_matrix_indices)
         res = res / res.max()
 
     print(res.sum())
