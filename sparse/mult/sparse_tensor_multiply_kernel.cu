@@ -9,9 +9,11 @@ __global__ void sparse_multiply_kernel(
     const float* sparse_matrix_values, int nnz2,
     const int* sparse_matrix_indices, int nnz3,
     float* output_values, int sparseCols) {
+
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    
-    // printf("%d - %d  \n", tid, nnz2);
+
+
+
     if (tid >= nnz2) return;
     // sparse_matrix =
     /*
@@ -22,10 +24,11 @@ __global__ void sparse_multiply_kernel(
       meaning sparse_matrix = { X Y VALUE ...}
 
     */
-    tid = tid * 2;
-    int x = sparse_matrix_indices[tid];
-    int y = sparse_matrix_indices[tid + 1];
-    atomicAdd(&output_values[x], activations[y] * sparse_matrix_values[tid]);
+
+    int x = sparse_matrix_indices[tid * 2];
+    int y = sparse_matrix_indices[tid * 2 + 1];
+
+    atomicAdd(&output_values[y], activations[x] * sparse_matrix_values[tid]);
     
 }
 
@@ -36,12 +39,12 @@ torch::Tensor sparse_multiply_cuda(
     auto output_values = torch::zeros({sparseCols}, torch::dtype(torch::kFloat32).device(torch::kCUDA));
     
     int nnz1 = activations.size(0);
-    int nnz2 = sparse_matrix_values.size(0);
+    int nnz2 = sparse_matrix_indices.size(0);
     int nnz3 = sparse_matrix_values.size(0);
 
     const int threads = 512; // this was 256
     const int blocks = (nnz2 + threads - 1) / threads;
-
+    // std::cout<< activations << ' ' << sparse_matrix_indices << ' ' << sparse_matrix_values << std::endl;
     sparse_multiply_kernel<<<blocks, threads>>>(
         activations.data_ptr<float>() , nnz1,
         sparse_matrix_values.data_ptr<float>(), nnz2,

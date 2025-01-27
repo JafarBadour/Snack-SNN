@@ -29,9 +29,9 @@ def ram_info():
 
 from sparse_tensor_multiply import sparse_multiply
 
-activation_size = 10000
-next_layer_size = 10000
-REPs = 500
+activation_size = 10
+next_layer_size = 10
+REPs = 1
 SPARSITY_LEVEL = float(sys.argv[2])
 def return_inps():
 
@@ -52,7 +52,7 @@ def return_inps():
     return W_matrix, activations
 
 W_matrix, activations = return_inps()
-print(W_matrix.shape)
+
 activations = activations.to('cuda')
 
 W_matrix = W_matrix.to('cuda')
@@ -105,7 +105,8 @@ else:
         res = sparse_multiply(res, W_matrix_values, W_matrix_indices, next_layer_size)
         res = res / res.max()
 
-    print(res.sum())
+
+    print("res", res)
     end_event.record()
     torch.cuda.synchronize()
 
