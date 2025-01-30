@@ -18,6 +18,7 @@ check this link to install cuda 12.6
 ```bash
 https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=22.04&target_type=deb_local```
 ```
+```
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
 ```
 
