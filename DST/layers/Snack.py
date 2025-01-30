@@ -73,7 +73,7 @@ class Snack(torch.nn.Module):
     def _erdos_renyi_sparse_weights(self, in_features, out_features, sparsity=0.1):
         """Generates a sparse weight matrix using Erdos-Renyi initialization."""
 
-        sp = create_random_sparse_matrix(in_features, out_features, sparsity)
+        sp = create_random_sparse_matrix(in_features, out_features, int(100 - 100 * sparsity))
         return sp.indices, sp.values
 
     def forward(self, x):
