@@ -1,4 +1,6 @@
 import torch
+import hashlib
+import pickle
 import typing as ty
 from sparse.mult.tensor.exceptions import  CastingError
 import warnings
@@ -22,7 +24,7 @@ def sparse_multiply(oned_tensor : torch.Tensor, indices : IntegerTensor, values 
     """
     return sparse_multiply_(oned_tensor, values, indices, output_shape)
 
-class SparseTensor:
+class SparseTensor(torch.nn.Module):
 
     def __init__(self, indices : IntegerTensor, values : torch.Tensor, matrix_shape : ty.Union[int, ty.Tuple[int]]) -> None:
 
@@ -33,16 +35,26 @@ class SparseTensor:
                 indices = indices.to(dtype=torch.int32)
             except Exception as e:
                 raise CastingError(inp_dtype=str(indices.dtype), e=e)
-        self.values = values
-        self.indices = indices
+
+
 
         if len(matrix_shape) > 2:
             raise NotImplementedError("""We support having only 1-D tensor output please raise a PR if you want to 
             contribute: https://github.com/JafarBadour/Parallel-Dynamic-Sparse-Training/pull/""")
+        super(SparseTensor, self).__init__()
 
+        self.indices = indices
         self.matrix_shape = matrix_shape
-        self.shape = self.shape_calc()
 
+
+
+        self.indices = indices
+
+
+        self.values = values
+        self.shape = self.shape_calc()
+    def matmul(self, other : torch.Tensor):
+        return self @ other
     def __matmul__(self, other):
         """
             A = S @ B where S is the sparse tensor.
@@ -86,6 +98,18 @@ class SparseTensor:
 
     def __repr__(self):
         return self.__str__()
+    def t(self):
+        indices = self.indices.clone()
+
+        indices[:, 0], indices[:, 1] = indices[:, 1].clone(), indices[:, 0].clone()
+        return SparseTensor(indices, self.values.clone(), tuple(reversed(self.matrix_shape)))
+    def hash(self):
+
+        serialized_tensor_values = pickle.dumps(self.values.cpu())  # or torch.save to BytesIO for large tensors
+        tensor_hash_values = hashlib.sha256(serialized_tensor_values).hexdigest()
+        serialized_tensor_indices =  pickle.dumps(self.indices.cpu())
+        tensor_hash_indices = hashlib.sha256(serialized_tensor_indices).hexdigest()
+        return f"indices={tensor_hash_values},values={tensor_hash_indices}"
 
 
 
