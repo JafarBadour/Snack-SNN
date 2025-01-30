@@ -21,6 +21,8 @@ __global__ void sparse_multiply_kernel(
       | 0 0 0 4 |
     w=| 0 1 0 0 |, => sparse_matrix = |0 3 4 1 1 1 2 0 1 2 1 1 2 2 1 2 3 1|
       | 1 1 1 1 |
+
+      {1 1 1} = {1 2 1 5}
       meaning sparse_matrix = { X Y VALUE ...}
 
     */
