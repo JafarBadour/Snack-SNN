@@ -31,8 +31,8 @@ class SparseFunc(Function):
             grad_input = sparse_tensor.t() @ grad_output
 
         if ctx.needs_input_grad[2]:  # Check if gradient w.r.t values is needed
-            if grad_input is None:
-                grad_input = sparse_tensor.t() @ grad_output
+            # if grad_input is None:
+            #     grad_input = sparse_tensor.t() @ grad_output
 
             # grad_values = (grad_output.t() @ input).view(-1)  # Correct gradient calculation for values bruh?
 
@@ -50,7 +50,7 @@ class SparseFunc(Function):
             # print(sparse_tensor.t())
             # print(f"{grad_output[indices_y]} * {grad_input[indices_x]}")
 
-            grad_values = grad_output[indices_y] * grad_input[indices_x]
+            grad_values = grad_output[indices_y] * input[indices_x]
 
             # print(grad_values)
 

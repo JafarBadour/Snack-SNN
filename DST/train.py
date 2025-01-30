@@ -7,8 +7,8 @@ from time import time as tic
 def train(type_, sparsity=0):
     import random
     random.seed(42)
-    input_size = 15000
-    output_size = 15000
+    input_size = 10000
+    output_size = 10000
     if type_ == 'Sparse':
 
         model = Snack(input_size, output_size, sparsity=sparsity).cuda()
@@ -50,9 +50,9 @@ def train(type_, sparsity=0):
 
 if __name__ == "__main__":
     data = []
-    for rep in tqdm(list(range(5))):
+    for rep in tqdm(list(range(1))):
         for sparsity in tqdm(np.linspace(
-                0.1, 1, 18)):
+                0.025, 1, 20)):
             dense_total_params, dense_time = train(type_='Dense', sparsity=sparsity)
             sparse_total_params, sparse_time = train(type_='Sparse', sparsity=sparsity)
             data.append({"isSparse": "Dense", "cuda_elapsed_time": dense_time, "total_params": dense_total_params, "sparsity_level" : sparsity})
