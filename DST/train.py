@@ -8,6 +8,7 @@ def train():
     output_size = 2
     model = Snack(input_size, output_size, sparsity=0.2).cuda()
     print(list(model.parameters()))
+
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
     criterion = torch.nn.MSELoss()
 
@@ -24,7 +25,7 @@ def train():
 
         if epoch % 10 == 0:
             print(f"Epoch {epoch}, Loss: {loss.item()}")
-            
+
 
 if __name__ == "__main__":
     train()
