@@ -1,12 +1,13 @@
 """
 Sparse network active cuda kernel
 """
+import typing
 
 from sparse.mult.tensor import SparseTensor, create_random_sparse_matrix
 import torch
 import torch.nn.functional as F
 from torch.autograd import Function
-
+import DST.initializers.uniform_initializer as uni_init
 
 class SparseFunc(Function):
     @staticmethod
@@ -58,22 +59,34 @@ class SparseFunc(Function):
         return grad_input, None, grad_values, None, None
 
 class Snack(torch.nn.Module):
-    def __init__(self, input_size, output_size, sparsity, device='cuda'):
-        super(Snack, self).__init__()
+    def __init__(self, input_size, output_size, sparsity, init: typing.Union[str, None], device='cuda'):
+        """
 
-        self.indices, self.values = self._erdos_renyi_sparse_weights(input_size, output_size, sparsity)
-        self.indices = self.indices.to(device)
+        :param input_size:
+        :param output_size:
+        :param sparsity:
+        :param init: "uniform_initializer" or None
+        :param device:
+        """
+        super(Snack, self).__init__()
         self.size = (input_size, output_size)
-        self.values = self.values.to(device).float()
-        self.values = torch.nn.Parameter(self.values)
+        if init == "uniform_initializer":
+            self.indices, self.values = self.__uniform__init__weights(input_size, output_size, sparsity)
+            self.indices = self.indices.to(device)
+
+            self.values = self.values.to(device).float()
+            self.values = torch.nn.Parameter(self.values)
+
         self.bias = None # add in future
         self.device = device
         self.sparsity = sparsity
 
-    def _erdos_renyi_sparse_weights(self, in_features, out_features, sparsity=0.1):
+    def __uniform__init__weights(self, in_features, out_features, sparsity=0.1):
         """Generates a sparse weight matrix using Erdos-Renyi initialization."""
 
-        sp = create_random_sparse_matrix(in_features, out_features, int(100 - 100 * sparsity))
+        indices = uni_init.init(in_features, out_features, sparsity=sparsity, device=self.device)
+        values = torch.rand(indices.size(0)).float()
+        sp = SparseTensor(indices=indices, values=values, matrix_shape=(in_features, out_features))
         return sp.indices, sp.values
 
     def forward(self, x):
