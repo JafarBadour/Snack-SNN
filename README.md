@@ -33,3 +33,10 @@ python setup.py build
 
 python setup.py install
 ```
+
+
+connection from remote
+
+```shell
+ssh -L 8888:localhost:8888 -p 2222 jafar@16.62.171.242
+```

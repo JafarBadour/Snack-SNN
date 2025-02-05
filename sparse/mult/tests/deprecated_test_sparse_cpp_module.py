@@ -2,6 +2,7 @@ import torch
 import os, sys
 from time import time as tic
 from time import sleep as sleep
+from sparse.mult.tests.__test_jax import test_jax
 import random
 random.seed(0)
 start_event = torch.cuda.Event(enable_timing=True)

@@ -1,5 +1,7 @@
 #include <torch/extension.h>
-#include <vector>
+#include <cstdlib>
+#include <ctime>
+#include <thread>
 #include <unordered_set>
 #include <random>
 
@@ -24,6 +26,37 @@ torch::Tensor sparse_multiply(
 }
 
 
+
+torch::Tensor sparse_multiply_cpu(
+    torch::Tensor activations, torch::Tensor sparse_matrix_values, torch::Tensor sparse_matrix_indices,
+    int64_t sparseCols // or next layer how many neurons
+    ) {
+
+    TORCH_CHECK(activations.device().is_cpu(), "activations must be a CPU tensor");
+    TORCH_CHECK(sparse_matrix_values.device().is_cpu(), "sparse_matrix must be a CPU tensor");
+    TORCH_CHECK(sparse_matrix_indices.device().is_cpu(), "sparse_matrix must be a CPU tensor");
+
+    int nnz1 = activations.size(0);
+    int nnz1_2 = activations.size(1);
+    auto output_values = torch::zeros({nnz1, sparseCols}, torch::dtype(torch::kFloat32).device(torch::kCPU));
+    int nnz2 = sparse_matrix_indices.size(0);
+    int nnz3 = sparse_matrix_values.size(0);
+    float* act = activations.data_ptr<float>();
+    float* sp_v = sparse_matrix_values.data_ptr<float>();
+    unsigned short * sp_i = sparse_matrix_indices.data_ptr<unsigned short>();
+    float * out = output_values.data_ptr<float>();
+    //printf("sup?==========\n");
+    for(int i=0;i<nnz2;i++){ // sp indices count/ count of values
+        for(int j=0;j<nnz1;j++){ // batches count
+            int x,y;
+            x = sp_i[i * 2];
+            y = sp_i[i * 2 + 1];
+            out[j * sparseCols + y] = sp_v[i] * act[j*nnz1 + x];
+        }
+    }
+    return output_values;
+    ///
+    }
 
 
 torch::Tensor random_init_without_replacement(
@@ -70,6 +103,7 @@ torch::Tensor random_init_without_replacement(
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("sparse_multiply", &sparse_multiply, "Sparse Tensor Multiplication (CUDA)");
+    m.def("sparse_multiply_cpu", &sparse_multiply_cpu, "Sparse Tensor Multiplication (CPU)");
 
     m.def("random_init_without_replacement", &random_init_without_replacement, "random_init_without_replacement");
 }

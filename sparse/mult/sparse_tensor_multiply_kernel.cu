@@ -29,12 +29,13 @@ __global__ void sparse_multiply_kernel(
 
     int x = sparse_matrix_indices[tid * 2];
     int y = sparse_matrix_indices[tid * 2 + 1];
-    int batch_ind = 0;
-
-    for(int i=0;i<nnz1_2;i++){
-
-        atomicAdd(&output_values[batch_ind + y], activations[batch_ind + x] * sparse_matrix_values[tid]);
-        batch_ind = batch_ind + nnz1_2;
+    int out_offset = 0;
+    int act_offset = 0;
+    float sp_val = sparse_matrix_values[tid];
+    for(int i=0;i<nnz1;i++){
+        atomicAdd(&output_values[out_offset + y], activations[act_offset + x] * sp_val);
+        out_offset += sparseCols;
+        act_offset += nnz1;
     }
     
 }
@@ -53,7 +54,7 @@ torch::Tensor sparse_multiply_cuda(
 
     const int threads = 512; // this was 256
     const int blocks = (nnz2 + threads - 1) / threads;
-    // std::cout<< activations << ' ' << sparse_matrix_indices << ' ' << sparse_matrix_values << std::endl;
+
     sparse_multiply_kernel<<<blocks, threads>>>(
         activations.data_ptr<float>() , nnz1, nnz1_2,
         sparse_matrix_values.data_ptr<float>(), nnz2,
