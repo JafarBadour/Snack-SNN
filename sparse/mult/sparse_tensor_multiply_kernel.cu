@@ -7,14 +7,20 @@ using namespace std;
 __global__ void sparse_multiply_kernel(
     const float* activations, int nnz1, int nnz1_2,
     const float* sparse_matrix_values, int nnz2,
-    const unsigned short* sparse_matrix_indices, int nnz3,
+    const unsigned short* sparse_matrix_indices_a,
+     const unsigned short* sparse_matrix_indices_b,
+     int nnz3,
     float* output_values, int sparseCols) {
 
-    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    int tid = blockIdx.y * blockDim.x + threadIdx.x;
+    int batch_n = blockIdx.x;
 
 
 
     if (tid >= nnz2) return;
+    //printf("%d,%d -- %d, %d, %d, %d  -- %d %d \n",
+     //tid, batch_n, blockIdx.x, blockIdx.y, threadIdx.x, threadIdx.y,  blockDim.x, blockDim.y);
+
     // sparse_matrix =
     /*
 
@@ -27,38 +33,41 @@ __global__ void sparse_multiply_kernel(
 
     */
 
-    int x = sparse_matrix_indices[tid * 2];
-    int y = sparse_matrix_indices[tid * 2 + 1];
-    int out_offset = 0;
-    int act_offset = 0;
+
+    unsigned short out_offset = batch_n * sparseCols;
+     unsigned short act_offset = batch_n * nnz1_2;
+
+    unsigned short x = sparse_matrix_indices_a[tid];
+    unsigned short y = sparse_matrix_indices_b[tid];
     float sp_val = sparse_matrix_values[tid];
-    for(int i=0;i<nnz1;i++){
-        atomicAdd(&output_values[out_offset + y], activations[act_offset + x] * sp_val);
-        out_offset += sparseCols;
-        act_offset += nnz1;
-    }
+
+    atomicAdd(&output_values[out_offset + y], activations[act_offset + x] * sp_val);
+
     
 }
 
 // Sparse tensor multiplication interface
 torch::Tensor sparse_multiply_cuda(
-    torch::Tensor activations, torch::Tensor sparse_matrix_values, torch::Tensor sparse_matrix_indices,
-    int64_t sparseCols) {
+    torch::Tensor activations, torch::Tensor sparse_matrix_values, torch::Tensor sparse_matrix_indices_a,
+    torch::Tensor sparse_matrix_indices_b, int64_t sparseCols) {
 
     
     int nnz1 = activations.size(0);
     int nnz1_2 = activations.size(1);
     auto output_values = torch::zeros({nnz1, sparseCols}, torch::dtype(torch::kFloat32).device(torch::kCUDA));
-    int nnz2 = sparse_matrix_indices.size(0);
+    int nnz2 = sparse_matrix_indices_a.size(0);
     int nnz3 = sparse_matrix_values.size(0);
 
-    const int threads = 512; // this was 256
+    const int threads = 1024; // this was 256
     const int blocks = (nnz2 + threads - 1) / threads;
+    dim3 threadsPerBlock(threads);    // 16 threads in each dimension; 16 is batch for ex
+    dim3 blocksPerGrid(nnz1, blocks);      //
 
-    sparse_multiply_kernel<<<blocks, threads>>>(
+    sparse_multiply_kernel<<<blocksPerGrid, threadsPerBlock>>>(
         activations.data_ptr<float>() , nnz1, nnz1_2,
         sparse_matrix_values.data_ptr<float>(), nnz2,
-        sparse_matrix_indices.data_ptr<unsigned short>(), nnz3,
+        sparse_matrix_indices_a.data_ptr<unsigned short>(),
+        sparse_matrix_indices_b.data_ptr<unsigned short>(), nnz3,
         output_values.data_ptr<float>(), sparseCols);
 
     return output_values;

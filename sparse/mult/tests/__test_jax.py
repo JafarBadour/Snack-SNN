@@ -6,7 +6,8 @@ from tqdm import tqdm
 from sparse.mult.tensor import SparseTensor
 import torch
 def test_jax(log : list, sparse_matrix :SparseTensor, layera : int, layerb: int,
-             ones : torch.Tensor, sparsity_level, dense_level, reps):
+             ones : torch.Tensor, sparsity_level, dense_level, reps, batsh_sz):
+
     gpu = jax.devices("gpu")[0] if jax.local_devices() else None
     sparse_matrix = jsparse.BCOO.fromdense(sparse_matrix.dense())
     sparse_matrix_gpu = jax.device_put(sparse_matrix, gpu)
@@ -40,4 +41,6 @@ def test_jax(log : list, sparse_matrix :SparseTensor, layera : int, layerb: int,
         torch.cuda.synchronize()
         elapsed_time_ms = start_event.elapsed_time(end_event)
         log.append({"isSparse": "JaxSparse", "dense_level": dense_level,
-                    "sparsity_level": sparsity_level, "time": t2 - t1, "cuda_elapsed_time": elapsed_time_ms, 'rep': rep})
+                    "sparsity_level": sparsity_level, "time": t2 - t1, "cuda_elapsed_time": elapsed_time_ms,
+                    'rep': rep, 'batch_size' : batsh_sz})
+
