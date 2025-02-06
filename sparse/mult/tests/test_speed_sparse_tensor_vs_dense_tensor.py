@@ -18,9 +18,9 @@ dense_levels = {
        #"500x500" : {'Reps' : 10},
       # "1000x1000" : {'Reps' : 10},
       # "5000x5000" : {'Reps' : 10},
-       "5200x5200" : {'Reps' : 5},
+      # "5200x5200" : {'Reps' : 5},
 
-    # "40000x10000" : {'Reps' : 10},
+     "40000x10000" : {'Reps' : 10},
      # "10000x10000" : {'Reps' : 10},
 }
 batches_cnt = [1<<i for i in range(5)]
@@ -96,7 +96,7 @@ for BATCH_SIZE in tqdm(batches_cnt, desc='Batches processing'):
                             'rep': rep,  'batch_size' : BATCH_SIZE})
 
             del dense_matrix
-
+            continue
             indices = torch.concat((sparse_matrix.indices_a.reshape(1, -1),
                                     sparse_matrix.indices_b.reshape(1, -1)), axis=0)
 
@@ -130,10 +130,10 @@ for BATCH_SIZE in tqdm(batches_cnt, desc='Batches processing'):
 
             df = pd.DataFrame(log)
 
-            df.to_csv("./tests/log10a.csv", index=False)
+            df.to_csv("./tests/log40k10k.csv", index=False)
 
 df = pd.DataFrame(log)
-df.to_csv("./tests/log10a.csv", index=False)
+df.to_csv("./tests/log40k10k.csv", index=False)
 
 
 

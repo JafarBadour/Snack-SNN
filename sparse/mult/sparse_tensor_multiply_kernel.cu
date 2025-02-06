@@ -58,7 +58,7 @@ torch::Tensor sparse_multiply_cuda(
     int nnz2 = sparse_matrix_indices_a.size(0);
     int nnz3 = sparse_matrix_values.size(0);
 
-    const int threads = 1024; // this was 256
+    const int threads = 516; // this was 256
     const int blocks = (nnz2 + threads - 1) / threads;
     dim3 threadsPerBlock(threads);    // 16 threads in each dimension; 16 is batch for ex
     dim3 blocksPerGrid(nnz1, blocks);      //
