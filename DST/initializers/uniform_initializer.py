@@ -1,6 +1,6 @@
 import torch
 
-
+from sparse_tensor_multiply import random_init_without_replacement
 def init(input_shape : int, output_shape : int, device='cpu', sparsity=0.9) -> torch.Tensor:
     """
 
@@ -14,7 +14,7 @@ def init(input_shape : int, output_shape : int, device='cpu', sparsity=0.9) -> t
 
     nz = int((1 - sparsity) * input_shape * output_shape)
     built_edges = torch.empty((0,2))
-    return random_init_without_replacement(input_shape, output_shape, nz, built_edges).to(device)
+    return init_without_replacement(input_shape, output_shape, nz, built_edges).to(device)
 
 
 
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     # r = init(5000, 5000, 'cuda', 0.2)
     # #, device='cuda')
     # print(r)
-    from sparse_tensor_multiply import random_init_without_replacement
+
 
     ee = torch.tensor([[0, 1]], dtype=torch.int32)
     r = random_init_without_replacement(2, 2, 3, ee)

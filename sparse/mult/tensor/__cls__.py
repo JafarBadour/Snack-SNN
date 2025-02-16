@@ -38,12 +38,19 @@ def sparse_multiply(oned_tensor : torch.Tensor, indices_a : UnsignedShortInteger
     """
     if device=="cpu":
         return sparse_multiply_cpu_(oned_tensor, indices_a, indices_b, values, output_shape)
+
+    # print(oned_tensor.shape)
+    # print(values.shape)
+    # print(indices_a.shape)
+    # print(indices_b.shape)
     return sparse_multiply_(oned_tensor, values, indices_a, indices_b, output_shape)
 
 class SparseTensor(torch.nn.Module):
 
-    def __init__(self, indices_a : torch.Tensor = None, indices_b : torch.Tensor = None, indices : UnsignedShortIntegerTensor = None,
+    def __init__(self, *args, indices_a : torch.Tensor = None, indices_b : torch.Tensor = None, indices : UnsignedShortIntegerTensor = None,
                  values : torch.Tensor = None, matrix_shape : ty.Union[int, ty.Tuple[int]] = None, device : str = None) -> None:
+        if len(args) != 0:
+            raise ValueError("SparseTensor accepts only keywords arguments")
         if device and device.startswith('cuda') and not  (indices_a.is_cuda and indices_b.is_cuda and values.is_cuda):
             raise NotImplementedError(f'device has to be None or cpu not {device}. to move to cuda use .cuda afterwards')
         # indices = indices.int()[(indices.float()[:,0]*indices.size(0)+indices[:,1]).sort().indices]

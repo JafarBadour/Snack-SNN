@@ -19,8 +19,8 @@ def train(type_, sparsity=0):
     criterion = torch.nn.MSELoss()
 
     # Dummy data
-    x = torch.randn(input_size).cuda()
-    target = torch.randn(output_size).cuda()
+    x = torch.randn((1, input_size)).cuda()
+    target = torch.randn((1, output_size)).cuda()
     start_event = torch.cuda.Event(enable_timing=True)
     end_event = torch.cuda.Event(enable_timing=True)
 
@@ -52,11 +52,11 @@ if __name__ == "__main__":
     data = []
     for rep in tqdm(list(range(1))):
         for sparsity in tqdm(np.linspace(
-                0.025, 1, 20)):
+                0.5, 1, 10)):
             dense_total_params, dense_time = train(type_='Dense', sparsity=sparsity)
             sparse_total_params, sparse_time = train(type_='Sparse', sparsity=sparsity)
-            data.append({"isSparse": "Dense", "cuda_elapsed_time": dense_time, "total_params": dense_total_params, "sparsity_level" : sparsity})
             data.append({"isSparse" : "Sparse" , "cuda_elapsed_time" : sparse_time, "total_params" : sparse_total_params, "sparsity_level" : sparsity})
+            data.append({"isSparse" : "Dense", "cuda_elapsed_time": dense_time, "total_params": dense_total_params, "sparsity_level" : sparsity})
 
     df = pd.DataFrame.from_records(data)
     df.to_csv("DST/log.csv", index=False)
