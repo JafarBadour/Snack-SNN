@@ -1,7 +1,11 @@
 import torch
 
 from sparse_tensor_multiply import random_init_without_replacement
-def init(input_shape : int, output_shape : int, device='cpu', sparsity=0.9) -> torch.Tensor:
+
+
+def init(
+    input_shape: int, output_shape: int, device="cpu", sparsity=0.9
+) -> torch.Tensor:
     """
 
     :param input_shape:
@@ -10,15 +14,24 @@ def init(input_shape : int, output_shape : int, device='cpu', sparsity=0.9) -> t
     :return:
     """
     if sparsity < 0.2:
-        raise ValueError("Sparsity is less 0.2 which is inefficient for the uniform initializer")
+        raise ValueError(
+            "Sparsity is less 0.2 which is inefficient for the uniform initializer"
+        )
 
     nz = int((1 - sparsity) * input_shape * output_shape)
-    built_edges = torch.empty((0,2))
-    return init_without_replacement(input_shape, output_shape, nz, built_edges).to(device)
+    built_edges = torch.empty((0, 2))
+    return init_without_replacement(input_shape, output_shape, nz, built_edges).to(
+        device
+    )
 
 
-
-def init_without_replacement(input_shape : int, output_shape : int, nz : int, excluded_edges : torch.Tensor, device='cpu'):
+def init_without_replacement(
+    input_shape: int,
+    output_shape: int,
+    nz: int,
+    excluded_edges: torch.Tensor,
+    device="cpu",
+):
     ee = excluded_edges.to(dtype=torch.int32)
     return random_init_without_replacement(input_shape, output_shape, nz, ee)
 
@@ -27,7 +40,6 @@ if __name__ == "__main__":
     # r = init(5000, 5000, 'cuda', 0.2)
     # #, device='cuda')
     # print(r)
-
 
     ee = torch.tensor([[0, 1]], dtype=torch.int32)
     r = random_init_without_replacement(2, 2, 3, ee)
