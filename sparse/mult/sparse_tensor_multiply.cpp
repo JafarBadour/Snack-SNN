@@ -4,6 +4,7 @@
 #include <thread>
 #include <unordered_set>
 #include <random>
+#include <bitset>
 
 typedef long long ll;
 torch::Tensor sparse_multiply_cuda(
@@ -67,43 +68,51 @@ torch::Tensor sparse_multiply_cpu(
 
 
 torch::Tensor random_init_without_replacement(
-        int input_size, int output_size, int sub_edges_sz,  torch::Tensor built_edges
+        const int input_size, const int output_size,const int sub_edges_sz,  torch::Tensor built_edges
     ) {
-    int * ptr = new int [2 * sub_edges_sz];
-    std::unordered_set<long long> hashy;
+    if(1ll * input_size * output_size  / 2 < sub_edges_sz)
+        throw std::runtime_error("Uniform distribution accepts sparsity > 0.5 only");
+    std::vector<std::vector<bool>> hashy(input_size, std::vector<bool>(output_size));
     std::random_device rd;
+    std::random_device rd2;
     std::mt19937 gen(rd());  // Mersenne Twister engine, initialized with the random seed
-    std::mt19937 gen2(rd());  // Mersenne Twister engine, initialized with the random seed
+    std::mt19937 gen2(rd2());  // Mersenne Twister engine, initialized with the random seed
     std::uniform_int_distribution<> dis_a(0, input_size-1);
     std::uniform_int_distribution<> dis_b(0, output_size-1);
+
+    torch::Tensor res = torch::zeros({sub_edges_sz, 2}, torch::kInt);
+
+    int* ptr = res.data_ptr<int>();  // Get pointer to Tensor's internal memory
 
     int * built_edges_ptr = built_edges.data_ptr<int>();
     int maxy = 1 + (input_size > output_size) ? input_size : output_size;
     for(int i=0;i<built_edges.size(0); i++){
-            long long hash_t = 1ll * built_edges_ptr[i] * maxy + built_edges_ptr[i+1];
-            hashy.insert(hash_t);
+            hashy[built_edges_ptr[i]][built_edges_ptr[i+1]] = 1;
     }
+
     for(int i=0;i< 2*sub_edges_sz;i+=2){
         int depth = 0;
-        int64_t hash_p = -1;
+        int hash_x, hash_y;
+        hash_x = -1;
+        hash_y = -1;
         do
         {
-            hashy.insert(hash_p);
-            //assert(0 && "depth exceeded generating random numbers issue");
-            if(depth > 25000){
-                throw std::runtime_error("Random gen error: depth 25k trying to sample unreplaced number");
+            if(depth > 100){
+                throw std::runtime_error("Random gen error: depth 25 trying to sample unreplaced number");
             }
             depth = depth + 1;
-            ptr[i] = dis_a(gen);
-            ptr[i+1] = dis_b(gen2);
-            hash_p = 1ll* ptr[i] * maxy + ptr[i+1];
+            hash_x= dis_a(gen);
+            hash_y = dis_b(gen2);
+            ptr[i] = hash_x;
+            ptr[i+1] = hash_y;
+            if(hashy[hash_x][hash_y])
+                continue;
+            hashy[hash_x][hash_y] = 1;
+            break;
+        }while(true);
 
-        }while(hashy.find(hash_p)!= hashy.end() || 0 > ptr[i] || ptr[i]>=input_size || ptr[i+1] < 0 || ptr[i+1] >= output_size);
-        hashy.insert(hash_p);
     }
 
-    auto res =  at::from_blob(ptr, {sub_edges_sz, 2}, at::kInt);;
-   // delete ptr;
     return res;
 }
 

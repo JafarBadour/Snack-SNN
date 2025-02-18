@@ -1,10 +1,18 @@
 from torch import nn
 import torch
+
+
 class Dense(nn.Module):
-    def __init__(self, input_size, output_size, bias=True, activation=None, device='cuda'):
+    def __init__(
+        self, input_size, output_size, bias=True, activation=None, device="cuda"
+    ):
         super(Dense, self).__init__()
-        self.linear = nn.Linear(input_size, output_size, bias=bias).to(device) # Linear layer
-        self.weight_mask = torch.ones_like(self.linear.weight).to(device)  # Initially all ones
+        self.linear = nn.Linear(input_size, output_size, bias=bias).to(
+            device
+        )  # Linear layer
+        self.weight_mask = torch.ones_like(self.linear.weight).to(
+            device
+        )  # Initially all ones
         self.weight_mask = self.weight_mask.to(device)
         self.weight_mask[0, :] = 0
 
