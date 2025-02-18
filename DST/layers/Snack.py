@@ -4,11 +4,12 @@ Sparse network active cuda kernel
 
 import typing
 
-from sparse.mult.tensor import SparseTensor, create_random_sparse_matrix
+from sparse.mult.tensor import SparseTensor
 import torch
-import torch.nn.functional as F
 from torch.autograd import Function
-import DST.initializers.uniform_initializer as uni_init
+from DST.initializers.uniform_initializer import UniformInitializer
+from DST.initializers.grand import SparseInitializer
+
 
 
 class SparseFunc(Function):
@@ -55,14 +56,9 @@ class SparseFunc(Function):
             grad_input = sparse_tensor.t() @ grad_output
 
         if ctx.needs_input_grad[2]:  # Check if gradient w.r.t values is needed
-            # if grad_input is None:
-            #     grad_input = sparse_tensor.t() @ grad_output
-
-            # grad_values = (grad_output.t() @ input).view(-1)  # Correct gradient calculation for values bruh?
 
             grad_values = grad_output[indices_a] * input[indices_b]
 
-            # print(grad_values)
 
         return grad_input, None, None, grad_values, None, None
 
@@ -73,8 +69,9 @@ class Snack(torch.nn.Module):
         input_size,
         output_size,
         sparsity,
-        init: typing.Union[str] = "uniform_initializer",
+        initializer: typing.Type[SparseInitializer] = None,
         device="cuda",
+        debug=False,
     ):
         """
 
@@ -88,21 +85,31 @@ class Snack(torch.nn.Module):
         self.size = (input_size, output_size)
         self.bias = None  # add in future
         self.device = device
+        if not (1 > sparsity >= 0):
+            raise ValueError("Sparsity is out of range [0, 1[")
         self.sparsity = sparsity
-        if init == "uniform_initializer":
-            self.indices_a, self.indices_b, self.values = self.__uniform__init__weights(
-                input_size, output_size, sparsity
-            )
-            self.indices_a = self.indices_a.to(device)
-            self.indices_b = self.indices_b.to(device)
+        if initializer is None:
+            raise TypeError("""initializer cannot be None you can use 
+            `DST.initializers.uniform_initializer.UniformInitializer` or others in the initializers subdirectory""")
 
-            self.values = self.values.to(device).float()
-            self.values = torch.nn.Parameter(self.values)
+        if not issubclass(initializer, SparseInitializer):
+            raise TypeError("""initializer Must implement SparseInitializer""")
 
-    def __uniform__init__weights(self, in_features, out_features, sparsity=0.1):
+
+        self.indices_a, self.indices_b, self.values = self.__init__weights(
+            initializer, input_size, output_size, sparsity
+        )
+        self.indices_a = self.indices_a.to(device)
+        self.indices_b = self.indices_b.to(device)
+
+        self.values = self.values.to(device).float()
+        self.values = torch.nn.Parameter(self.values)
+        self.debug = debug
+
+    def __init__weights(self, init_cls__ : typing.Type[SparseInitializer], in_features, out_features, sparsity=0.1):
         """Generates a sparse weight matrix using Erdos-Renyi initialization."""
 
-        indices = uni_init.init(
+        indices = init_cls__.initialize(
             in_features, out_features, sparsity=sparsity, device=self.device
         )
         indices_a, indices_b = indices[:, 0], indices[:, 1]
@@ -128,3 +135,11 @@ class Snack(torch.nn.Module):
             indices_b=self.indices_b,
             matrix_shape=self.size,
         ).hash()
+
+    def __str__(self):
+        return f"""
+        Snack(indices_a={self.indices_a}, indices_b={self.indices_b}, values={self.values})
+        """
+
+    def __repr__(self):
+        return self.__str__()

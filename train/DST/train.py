@@ -3,18 +3,30 @@ from tqdm import tqdm
 import pandas as pd
 import torch
 from DST.layers import Snack, Dense
+from DST.initializers.uniform_initializer import UniformInitializer
+from DST.initializers.fixed_degree import FixedDegreeRandomInitializer
+
 from time import time as tic
 
+input_size = 10000
+output_size = 10000
 
-def train(type_, sparsity=0):
+
+def train_n_batch_only_(input_size, output_size, batch_sz, type_, sparsity=0):
     import random
 
     random.seed(42)
-    input_size = 10000
-    output_size = 10000
+    t1 = tic()
+    # print(
+    #     f"Initing {dict(input_size=input_size,
+    #                       output_size=output_size,
+    #                       batch_sz=batch_sz,
+    #                       type_=type_,
+    #                       sparsity=sparsity)}\n"
+    # )
     if type_ == "Sparse":
 
-        model = Snack(input_size, output_size, sparsity=sparsity).cuda()
+        model = Snack(input_size, output_size, sparsity=sparsity, initializer=FixedDegreeRandomInitializer, debug=True).cuda()
     else:
         model = Dense(input_size, output_size).cuda()
 
@@ -22,8 +34,8 @@ def train(type_, sparsity=0):
     criterion = torch.nn.MSELoss()
 
     # Dummy data
-    x = torch.randn((1, input_size)).cuda()
-    target = torch.randn((1, output_size)).cuda()
+    x = torch.randn((batch_sz, input_size)).cuda()
+    target = torch.randn((batch_sz, output_size)).cuda()
     start_event = torch.cuda.Event(enable_timing=True)
     end_event = torch.cuda.Event(enable_timing=True)
 
@@ -47,30 +59,49 @@ def train(type_, sparsity=0):
     # print("model params", total_params)
     # print(f"Execution time: {elapsed_time_ms:.6f} ms")
     return total_params, elapsed_time_ms
-
-
-if __name__ == "__main__":
+def train_n_batch_only():
     data = []
-    for rep in tqdm(list(range(1))):
-        for sparsity in tqdm(np.linspace(0.5, 1, 10)):
-            dense_total_params, dense_time = train(type_="Dense", sparsity=sparsity)
-            sparse_total_params, sparse_time = train(type_="Sparse", sparsity=sparsity)
-            data.append(
-                {
-                    "isSparse": "Sparse",
-                    "cuda_elapsed_time": sparse_time,
-                    "total_params": sparse_total_params,
-                    "sparsity_level": sparsity,
-                }
-            )
-            data.append(
-                {
-                    "isSparse": "Dense",
-                    "cuda_elapsed_time": dense_time,
-                    "total_params": dense_total_params,
-                    "sparsity_level": sparsity,
-                }
-            )
 
-    df = pd.DataFrame.from_records(data)
-    df.to_csv("DST/log.csv", index=False)
+    for rep in tqdm(list(range(1)), desc='Repeating'):
+        for sparsity in tqdm([0, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 0.99], desc='Sparsity processing'):
+            for batch_sz in tqdm([1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024], desc='batch processing'):
+                dense_total_params, dense_time = train_n_batch_only_(
+                    batch_sz=batch_sz,
+                    type_="Dense",
+                    input_size=input_size,
+                    output_size=output_size,
+                )
+                sparse_total_params, sparse_time = train_n_batch_only_(
+                    batch_sz=batch_sz,
+                    type_="Sparse",
+                    sparsity=sparsity,
+                    input_size=input_size,
+                    output_size=output_size,
+                )
+                data.append(
+                    {
+                        "isSparse": "Sparse",
+                        "batch_size": batch_sz,
+                        "dense_level": f"{input_size}x{output_size}",
+                        "cuda_elapsed_time": sparse_time,
+                        "total_params": sparse_total_params,
+                        "sparsity_level": sparsity,
+                        "rep": rep,
+                    }
+                )
+                data.append(
+                    {
+                        "isSparse": "Dense",
+                        "batch_size": batch_sz,
+                        "dense_level": f"{input_size}x{output_size}",
+                        "cuda_elapsed_time": dense_time,
+                        "total_params": dense_total_params,
+                        "sparsity_level": sparsity,
+                        "rep": rep,
+                    }
+                )
+
+                df = pd.DataFrame.from_records(data)
+                df.to_csv("DST/log.csv", index=False)
+if __name__ == "__main__":
+    train_n_batch_only()
