@@ -38,9 +38,7 @@ warnings.filterwarnings("ignore")
 log = []
 
 for BATCH_SIZE in tqdm(batches_cnt, desc="Batches processing"):
-    for dense_level in tqdm(
-        dense_levels.keys(), desc="Processing Dense Levels", leave=False
-    ):
+    for dense_level in tqdm(dense_levels.keys(), desc="Processing Dense Levels", leave=False):
         layera, layerb = list(map(int, dense_level.split("x")))
 
         for sparsity_level in tqdm(sparsity_levels, desc="Sparsity Lvls", leave=False):

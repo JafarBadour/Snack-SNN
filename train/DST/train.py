@@ -24,9 +24,15 @@ def train_n_batch_only_(input_size, output_size, batch_sz, type_, sparsity=0):
     #                       type_=type_,
     #                       sparsity=sparsity)}\n"
     # )
-    if type_ == "Sparse":
+    if type_ == "Snack":
 
-        model = Snack(input_size, output_size, sparsity=sparsity, initializer=FixedDegreeRandomInitializer, debug=True).cuda()
+        model = Snack(
+            input_size,
+            output_size,
+            sparsity=sparsity,
+            initializer=FixedDegreeRandomInitializer,
+            debug=True,
+        ).cuda()
     else:
         model = Dense(input_size, output_size).cuda()
 
@@ -59,12 +65,17 @@ def train_n_batch_only_(input_size, output_size, batch_sz, type_, sparsity=0):
     # print("model params", total_params)
     # print(f"Execution time: {elapsed_time_ms:.6f} ms")
     return total_params, elapsed_time_ms
+
+
 def train_n_batch_only():
     data = []
 
-    for rep in tqdm(list(range(1)), desc='Repeating'):
-        for sparsity in tqdm([0, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 0.99], desc='Sparsity processing'):
-            for batch_sz in tqdm([1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024], desc='batch processing'):
+    for rep in tqdm(list(range(1)), desc="Repeating"):
+        for sparsity in tqdm(
+            [0, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 0.99],
+            desc="Sparsity processing",
+        ):
+            for batch_sz in tqdm([1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024], desc="batch processing"):
                 dense_total_params, dense_time = train_n_batch_only_(
                     batch_sz=batch_sz,
                     type_="Dense",
@@ -73,14 +84,14 @@ def train_n_batch_only():
                 )
                 sparse_total_params, sparse_time = train_n_batch_only_(
                     batch_sz=batch_sz,
-                    type_="Sparse",
+                    type_="Snack",
                     sparsity=sparsity,
                     input_size=input_size,
                     output_size=output_size,
                 )
                 data.append(
                     {
-                        "isSparse": "Sparse",
+                        "isSparse": "Snack",
                         "batch_size": batch_sz,
                         "dense_level": f"{input_size}x{output_size}",
                         "cuda_elapsed_time": sparse_time,
@@ -103,5 +114,7 @@ def train_n_batch_only():
 
                 df = pd.DataFrame.from_records(data)
                 df.to_csv("DST/log.csv", index=False)
+
+
 if __name__ == "__main__":
     train_n_batch_only()

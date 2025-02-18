@@ -6,9 +6,7 @@ import torch
 from sparse.mult.tensor import SparseTensor
 
 
-def create_random_sparse_matrix(
-    layer_a_sz: int, layer_b_sz: int, sparsity_level: int, seed=42
-) -> SparseTensor:
+def create_random_sparse_matrix(layer_a_sz: int, layer_b_sz: int, sparsity_level: int, seed=42) -> SparseTensor:
     random.seed(seed)
 
     cutoff = int(((100 - sparsity_level) / 100) * (layer_b_sz * layer_a_sz))
@@ -24,6 +22,4 @@ def create_random_sparse_matrix(
     values = [random.random() for _ in range(len(indices))]
     indices = torch.tensor(indices, dtype=torch.int32)
     values = torch.tensor(values, dtype=torch.float32)
-    return SparseTensor(
-        indices=indices, values=values, matrix_shape=(layer_a_sz, layer_b_sz)
-    )
+    return SparseTensor(indices=indices, values=values, matrix_shape=(layer_a_sz, layer_b_sz))

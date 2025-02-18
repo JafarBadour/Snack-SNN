@@ -11,7 +11,6 @@ from DST.initializers.uniform_initializer import UniformInitializer
 from DST.initializers.grand import SparseInitializer
 
 
-
 class SparseFunc(Function):
     @staticmethod
     def forward(ctx, input, indices_a, indices_b, values, input_shape, output_shape):
@@ -59,7 +58,6 @@ class SparseFunc(Function):
 
             grad_values = grad_output[indices_a] * input[indices_b]
 
-
         return grad_input, None, None, grad_values, None, None
 
 
@@ -89,12 +87,13 @@ class Snack(torch.nn.Module):
             raise ValueError("Sparsity is out of range [0, 1[")
         self.sparsity = sparsity
         if initializer is None:
-            raise TypeError("""initializer cannot be None you can use 
-            `DST.initializers.uniform_initializer.UniformInitializer` or others in the initializers subdirectory""")
+            raise TypeError(
+                """initializer cannot be None you can use 
+            `DST.initializers.uniform_initializer.UniformInitializer` or others in the initializers subdirectory"""
+            )
 
         if not issubclass(initializer, SparseInitializer):
             raise TypeError("""initializer Must implement SparseInitializer""")
-
 
         self.indices_a, self.indices_b, self.values = self.__init__weights(
             initializer, input_size, output_size, sparsity
@@ -106,12 +105,16 @@ class Snack(torch.nn.Module):
         self.values = torch.nn.Parameter(self.values)
         self.debug = debug
 
-    def __init__weights(self, init_cls__ : typing.Type[SparseInitializer], in_features, out_features, sparsity=0.1):
+    def __init__weights(
+        self,
+        init_cls__: typing.Type[SparseInitializer],
+        in_features,
+        out_features,
+        sparsity=0.1,
+    ):
         """Generates a sparse weight matrix using Erdos-Renyi initialization."""
 
-        indices = init_cls__.initialize(
-            in_features, out_features, sparsity=sparsity, device=self.device
-        )
+        indices = init_cls__.initialize(in_features, out_features, sparsity=sparsity, device=self.device)
         indices_a, indices_b = indices[:, 0], indices[:, 1]
 
         values = torch.rand(indices.size(0)).float()
@@ -124,9 +127,9 @@ class Snack(torch.nn.Module):
         return sp.indices_a, sp.indices_b, sp.values
 
     def forward(self, x):
-        return SparseFunc.apply(
-            x, self.indices_a, self.indices_b, self.values, self.size[0], self.size[1]
-        ) + (self.bias if self.bias is not None else 0)
+        return SparseFunc.apply(x, self.indices_a, self.indices_b, self.values, self.size[0], self.size[1]) + (
+            self.bias if self.bias is not None else 0
+        )
 
     def sparse_hash(self):
         return SparseTensor(

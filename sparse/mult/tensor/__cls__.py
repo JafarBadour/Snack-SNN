@@ -46,9 +46,7 @@ def sparse_multiply(
     :return: result of multiplication of shape output_shape
     """
     if device == "cpu":
-        return sparse_multiply_cpu_(
-            oned_tensor, indices_a, indices_b, values, output_shape
-        )
+        return sparse_multiply_cpu_(oned_tensor, indices_a, indices_b, values, output_shape)
 
     # print(oned_tensor.shape)
     # print(values.shape)
@@ -71,11 +69,7 @@ class SparseTensor(torch.nn.Module):
     ) -> None:
         if len(args) != 0:
             raise ValueError("SparseTensor accepts only keywords arguments")
-        if (
-            device
-            and device.startswith("cuda")
-            and not (indices_a.is_cuda and indices_b.is_cuda and values.is_cuda)
-        ):
+        if device and device.startswith("cuda") and not (indices_a.is_cuda and indices_b.is_cuda and values.is_cuda):
             raise NotImplementedError(
                 f"device has to be None or cpu not {device}. to move to cuda use .cuda afterwards"
             )
@@ -126,9 +120,7 @@ class SparseTensor(torch.nn.Module):
         """
 
         if len(other.shape) > 2:
-            raise NotImplementedError(
-                """Only 2-D tensor to be multiplied with the matrix"""
-            )
+            raise NotImplementedError("""Only 2-D tensor to be multiplied with the matrix""")
 
         return sparse_multiply(
             other,
@@ -183,9 +175,7 @@ class SparseTensor(torch.nn.Module):
         return self.to("cuda")
 
     def __str__(self):
-        indices = torch.concat(
-            (self.indices_a.reshape(-1, 1), self.indices_b.reshape(-1, 1)), dim=1
-        )
+        indices = torch.concat((self.indices_a.reshape(-1, 1), self.indices_b.reshape(-1, 1)), dim=1)
         return f"""SparseTensor(indices={indices}, \nvalues={self.values}, \n, matrix_shape={self.matrix_shape})"""
 
     def shape_calc(self):
@@ -210,9 +200,7 @@ class SparseTensor(torch.nn.Module):
 
     def hash(self):
 
-        serialized_tensor_values = pickle.dumps(
-            self.values.cpu()
-        )  # or torch.save to BytesIO for large tensors
+        serialized_tensor_values = pickle.dumps(self.values.cpu())  # or torch.save to BytesIO for large tensors
         tensor_hash_values = hashlib.sha256(serialized_tensor_values).hexdigest()
         serialized_tensor_indices = pickle.dumps(self.indices_a.cpu())
         tensor_hash_indices = hashlib.sha256(serialized_tensor_indices).hexdigest()

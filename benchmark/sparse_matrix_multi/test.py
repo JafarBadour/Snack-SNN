@@ -8,13 +8,9 @@ def tst1():
 
         import torch
 
-        indices = torch.concat(
-            (sp.indices_a.reshape(1, -1), sp.indices_b.reshape(1, -1)), axis=0
-        )
+        indices = torch.concat((sp.indices_a.reshape(1, -1), sp.indices_b.reshape(1, -1)), axis=0)
 
-        return torch.sparse_coo_tensor(
-            indices, sp.values, sp.matrix_shape, device="cuda"
-        )
+        return torch.sparse_coo_tensor(indices, sp.values, sp.matrix_shape, device="cuda")
 
     sp = create_random_sparse_matrix(1000, 1000, 0)
 
