@@ -12,11 +12,11 @@ def tst1():
 
         return torch.sparse_coo_tensor(indices, sp.values, sp.matrix_shape, device="cuda")
 
-    sp = create_random_sparse_matrix(1000, 1000, 0)
+    sp = create_random_sparse_matrix(5000, 5000, 0)
 
     sp = sp.cuda()
 
-    ones = torch.ones((7, sp.matrix_shape[1])).cuda()
+    ones = torch.ones((16, sp.matrix_shape[0])).cuda()
 
     r1 = sp @ ones
 

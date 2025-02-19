@@ -13,14 +13,15 @@ from DST.initializers.grand import SparseInitializer
 
 class SparseFunc(Function):
     @staticmethod
-    def forward(ctx, input, indices_a, indices_b, values, input_shape, output_shape):
+    def forward(ctx, input, indices_a, indices_b, values, bias, input_shape, output_shape):
 
         ctx.save_for_backward(
             input,
             indices_a,
             indices_b,
             values,
-            torch.Tensor((input_shape, output_shape)),
+            bias,
+            torch.tensor([input_shape, output_shape]),
         )
 
         output = (
@@ -31,18 +32,18 @@ class SparseFunc(Function):
                 matrix_shape=(input_shape, output_shape),
             )
             @ input
-        )
+        ) + bias
 
         return output
 
     @staticmethod
     def backward(ctx, grad_output):
 
-        input, indices_a, indices_b, values, size = ctx.saved_tensors
+        input, indices_a, indices_b, values, bias, size = ctx.saved_tensors
 
         input_shape, output_shape = list(map(int, size))
         grad_input = None
-        grad_indices = None  # Important: Return None for indices (not differentiable)
+        grad_bias = None
         grad_values = None
         # print(ctx.needs_input_grad, "######")
         sparse_tensor = SparseTensor(
@@ -51,14 +52,20 @@ class SparseFunc(Function):
             values=values,
             matrix_shape=(input_shape, output_shape),
         )
-        if ctx.needs_input_grad[0]:  # Check if gradient w.r.t input is needed
+        if ctx.needs_input_grad[0]:
             grad_input = sparse_tensor.t() @ grad_output
 
-        if ctx.needs_input_grad[2]:  # Check if gradient w.r.t values is needed
+        if ctx.needs_input_grad[3]:
 
-            grad_values = grad_output[indices_a] * input[indices_b]
+            indices_a = indices_a.to(dtype=torch.long)
+            indices_b = indices_b.to(dtype=torch.long)
 
-        return grad_input, None, None, grad_values, None, None
+            grad_values = grad_output[:,indices_b] * input[:,indices_a]
+        if ctx.needs_input_grad[4]:
+            grad_bias = grad_output.sum(dim=0)
+
+        # print(ctx.needs_input_grad, grad_input)
+        return grad_input, None, None, grad_values, grad_bias, None, None
 
 
 class Snack(torch.nn.Module):
@@ -67,7 +74,9 @@ class Snack(torch.nn.Module):
         input_size,
         output_size,
         sparsity,
+        values: torch.Tensor = None,
         initializer: typing.Type[SparseInitializer] = None,
+
         device="cuda",
         debug=False,
     ):
@@ -81,7 +90,7 @@ class Snack(torch.nn.Module):
         """
         super(Snack, self).__init__()
         self.size = (input_size, output_size)
-        self.bias = None  # add in future
+        self.bias = torch.randn(output_size).to(device).float()
         self.device = device
         if not (1 > sparsity >= 0):
             raise ValueError("Sparsity is out of range [0, 1[")
@@ -100,9 +109,11 @@ class Snack(torch.nn.Module):
         )
         self.indices_a = self.indices_a.to(device)
         self.indices_b = self.indices_b.to(device)
-
+        if values is not None:
+            self.values = values
         self.values = self.values.to(device).float()
         self.values = torch.nn.Parameter(self.values)
+        self.bias = torch.nn.Parameter(self.bias)
         self.debug = debug
 
     def __init__weights(
@@ -117,7 +128,7 @@ class Snack(torch.nn.Module):
         indices = init_cls__.initialize(in_features, out_features, sparsity=sparsity, device=self.device)
         indices_a, indices_b = indices[:, 0], indices[:, 1]
 
-        values = torch.rand(indices.size(0)).float()
+        values = torch.randn(indices.size(0)).float()
         sp = SparseTensor(
             indices_a=indices_a,
             indices_b=indices_b,
@@ -127,18 +138,18 @@ class Snack(torch.nn.Module):
         return sp.indices_a, sp.indices_b, sp.values
 
     def forward(self, x):
-        return SparseFunc.apply(x, self.indices_a, self.indices_b, self.values, self.size[0], self.size[1]) + (
-            self.bias if self.bias is not None else 0
-        )
+        return SparseFunc.apply(x, self.indices_a, self.indices_b, self.values, self.bias, self.size[0], self.size[1])
+
 
     def sparse_hash(self):
+        return self.get_sp().hash()
+    def get_sp(self):
         return SparseTensor(
             values=self.values,
             indices_a=self.indices_a,
             indices_b=self.indices_b,
             matrix_shape=self.size,
-        ).hash()
-
+        )
     def __str__(self):
         return f"""
         Snack(indices_a={self.indices_a}, indices_b={self.indices_b}, values={self.values})

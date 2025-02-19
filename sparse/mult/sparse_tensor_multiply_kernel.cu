@@ -50,8 +50,8 @@ torch::Tensor sparse_multiply_cuda(
     auto output_values = torch::zeros({nnz1, sparseCols}, torch::dtype(torch::kFloat32).device(torch::kCUDA));
     int nnz2 = sparse_matrix_indices_a.size(0);
     int nnz3 = sparse_matrix_values.size(0);
-
-    const int threads = 1024; // this was 256
+    printf("===> %d", nnz1);
+    const int threads = 512; // this was 256
     const int blocks = (nnz2 + threads - 1) / threads;
     // std::cout<< activations << ' ' << sparse_matrix_indices << ' ' << sparse_matrix_values << std::endl;
     sparse_multiply_kernel<<<blocks, threads>>>(
@@ -60,5 +60,6 @@ torch::Tensor sparse_multiply_cuda(
         sparse_matrix_indices_a.data_ptr<unsigned short>(),
         sparse_matrix_indices_b.data_ptr<unsigned short>(), nnz3,
         output_values.data_ptr<float>(), sparseCols);
+
     return output_values;
 }
