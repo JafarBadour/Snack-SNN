@@ -10,20 +10,8 @@ from DST.initializers.fixed_degree import FixedDegreeRandomInitializer
 
 input_size = 28
 output_size = 28
-FC1 = Snack(
-    input_size * output_size,
-    128,
-    sparsity=0,
-    initializer=FixedDegreeRandomInitializer,
-    device="cuda",
-)
-FC2= Snack(
-    128,
-    10,
-    sparsity=0,
-    initializer=FixedDegreeRandomInitializer,
-    device="cuda",
-)
+
+
 class DenseLayer(nn.Module):
     def __init__(self, in_features, out_features):
         super(DenseLayer, self).__init__()
@@ -40,6 +28,8 @@ class DenseLayer(nn.Module):
         # Perform the linear transformation: y = Wx + b
         output = torch.matmul(x, self.weights.T) + self.bias
         return output
+
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 torch.manual_seed(0)
 # Load MNIST dataset
@@ -60,6 +50,20 @@ def train(type_: str, batch_size: int, sparsity: float = 0):
     # Define device
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    FC1 = Snack(
+        input_size * output_size,
+        128,
+        sparsity=sparsity,
+        initializer=FixedDegreeRandomInitializer,
+        device="cuda",
+    )
+    FC2 = Snack(
+        128,
+        10,
+        sparsity=sparsity,
+        initializer=FixedDegreeRandomInitializer,
+        device="cuda",
+    )
 
     # Define the model
     class NeuralNet(nn.Module):
@@ -86,7 +90,7 @@ def train(type_: str, batch_size: int, sparsity: float = 0):
 
             elif type_ == "Dense":
 
-                self.fc1 =DenseLayer( input_size * output_size, 128)
+                self.fc1 = DenseLayer(input_size * output_size, 128)
                 self.fc1.weights.data = FC1.get_sp().dense().t().detach().clone()
                 self.fc1.bias.data = FC1.bias.data.detach().clone()
 
@@ -124,8 +128,18 @@ def train(type_: str, batch_size: int, sparsity: float = 0):
 
             optimizer.step()
 
-            if batch_idx % 500 == 0:
-                print(f"Epoch {epoch + 1}/{epochs}, Batch {batch_idx}/{len(train_loader)}, Loss: {loss_item:.4f}")
+            if batch_idx % 250 == 0:
+                total_params = sum(p.numel() for p in model.parameters())
+                trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+                non_trainable_params = total_params - trainable_params
+                print(
+                    f"""
+                    =========================================
+                    Epoch {epoch + 1}/{epochs}, Batch {batch_idx}/{len(train_loader)}, 
+                    Loss: {loss_item:.4f} trainable/total params {trainable_params}/{total_params}
+                    =========================================
+                    """
+                )
 
     # Evaluation
     model.eval()
@@ -144,6 +158,5 @@ def train(type_: str, batch_size: int, sparsity: float = 0):
 
 
 if __name__ == "__main__":
-    train("Dense", 32)
-    train("Snack", 32, sparsity=0.)
-
+    # train("Dense", 128)
+    train("Snack", 128, sparsity=0.88)

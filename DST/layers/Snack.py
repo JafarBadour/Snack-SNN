@@ -4,7 +4,7 @@ Sparse network active cuda kernel
 
 import typing
 
-from sparse.mult.tensor import SparseTensor
+from sparse.mult.tensor import SparseTensor, sparse_outer_join
 import torch
 from torch.autograd import Function
 from DST.initializers.uniform_initializer import UniformInitializer
@@ -56,11 +56,9 @@ class SparseFunc(Function):
             grad_input = sparse_tensor.t() @ grad_output
 
         if ctx.needs_input_grad[3]:
+            # grad_values = grad_output[:, indices_b] * input[:, indices_a]
+            grad_values = sparse_outer_join(grad_output, indices_b, input, indices_a)
 
-            indices_a = indices_a.to(dtype=torch.long)
-            indices_b = indices_b.to(dtype=torch.long)
-
-            grad_values = grad_output[:,indices_b] * input[:,indices_a]
         if ctx.needs_input_grad[4]:
             grad_bias = grad_output.sum(dim=0)
 
@@ -76,7 +74,6 @@ class Snack(torch.nn.Module):
         sparsity,
         values: torch.Tensor = None,
         initializer: typing.Type[SparseInitializer] = None,
-
         device="cuda",
         debug=False,
     ):
@@ -107,8 +104,8 @@ class Snack(torch.nn.Module):
         self.indices_a, self.indices_b, self.values = self.__init__weights(
             initializer, input_size, output_size, sparsity
         )
-        self.indices_a = self.indices_a.to(device)
-        self.indices_b = self.indices_b.to(device)
+        self.indices_a = torch.nn.Parameter(self.indices_a.to(device), requires_grad=False)
+        self.indices_b = torch.nn.Parameter(self.indices_b.to(device), requires_grad=False)
         if values is not None:
             self.values = values
         self.values = self.values.to(device).float()
@@ -140,9 +137,9 @@ class Snack(torch.nn.Module):
     def forward(self, x):
         return SparseFunc.apply(x, self.indices_a, self.indices_b, self.values, self.bias, self.size[0], self.size[1])
 
-
     def sparse_hash(self):
         return self.get_sp().hash()
+
     def get_sp(self):
         return SparseTensor(
             values=self.values,
@@ -150,6 +147,7 @@ class Snack(torch.nn.Module):
             indices_b=self.indices_b,
             matrix_shape=self.size,
         )
+
     def __str__(self):
         return f"""
         Snack(indices_a={self.indices_a}, indices_b={self.indices_b}, values={self.values})
@@ -157,3 +155,9 @@ class Snack(torch.nn.Module):
 
     def __repr__(self):
         return self.__str__()
+    def __del__(self):
+        del self.values
+        del self.indices_b
+        del self.indices_a
+        del self.bias
+        torch.cuda.empty_cache()  # Clears unreferenced memory (optional)

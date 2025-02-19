@@ -16,7 +16,7 @@ def tst1():
 
     sp = sp.cuda()
 
-    ones = torch.ones((16, sp.matrix_shape[0])).cuda()
+    ones = torch.randn((32, sp.matrix_shape[0])).cuda()
 
     r1 = sp @ ones
 
@@ -71,4 +71,4 @@ def tst3():
 
 
 if __name__ == "__main__":
-    tst1()
+    tst3()

@@ -8,8 +8,8 @@ from DST.initializers.fixed_degree import FixedDegreeRandomInitializer
 
 from time import time as tic
 
-input_size = 10000
-output_size = 10000
+input_size = 5000
+output_size = 5000
 
 
 def train_n_batch_only_(input_size, output_size, batch_sz, type_, sparsity=0):
