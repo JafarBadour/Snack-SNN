@@ -3,13 +3,13 @@ from tqdm import tqdm
 import pandas as pd
 import torch
 from DST.layers import Snack, Dense
-from DST.initializers.uniform_initializer import UniformInitializer
+from benchmark.gpu.profiler import GPUAsyncProfiler
 from DST.initializers.fixed_degree import FixedDegreeRandomInitializer
 
 from time import time as tic
 
-input_size = 5000
-output_size = 5000
+input_size = 20000
+output_size = 10000
 
 
 def train_n_batch_only_(input_size, output_size, batch_sz, type_, sparsity=0):
@@ -17,13 +17,7 @@ def train_n_batch_only_(input_size, output_size, batch_sz, type_, sparsity=0):
 
     random.seed(42)
     t1 = tic()
-    # print(
-    #     f"Initing {dict(input_size=input_size,
-    #                       output_size=output_size,
-    #                       batch_sz=batch_sz,
-    #                       type_=type_,
-    #                       sparsity=sparsity)}\n"
-    # )
+
     if type_ == "Snack":
 
         model = Snack(
@@ -44,9 +38,10 @@ def train_n_batch_only_(input_size, output_size, batch_sz, type_, sparsity=0):
     target = torch.randn((batch_sz, output_size)).cuda()
     start_event = torch.cuda.Event(enable_timing=True)
     end_event = torch.cuda.Event(enable_timing=True)
-
+    prof = GPUAsyncProfiler(0.1)
+    prof.start_benchmark()
     start_event.record()
-    t1 = tic()
+
     torch.cuda.synchronize()
     for epoch in range(100):
         optimizer.zero_grad()
@@ -59,12 +54,15 @@ def train_n_batch_only_(input_size, output_size, batch_sz, type_, sparsity=0):
         #     print(f"Epoch {epoch}, Loss: {loss.item()}")
     # print(type_, tic() - t1)
     end_event.record()
+    gpu_df = prof.stop_benchmark()
     torch.cuda.synchronize()
     elapsed_time_ms = start_event.elapsed_time(end_event)
     total_params = sum(p.numel() for p in model.parameters())
     # print("model params", total_params)
     # print(f"Execution time: {elapsed_time_ms:.6f} ms")
-    return total_params, elapsed_time_ms
+    del model
+    del x
+    return total_params, elapsed_time_ms, gpu_df
 
 
 def train_n_batch_only():
@@ -76,30 +74,29 @@ def train_n_batch_only():
             desc="Sparsity processing",
         ):
             for batch_sz in tqdm([1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024], desc="batch processing"):
-                dense_total_params, dense_time = train_n_batch_only_(
+                dense_total_params, dense_time, gpu_df = train_n_batch_only_(
                     batch_sz=batch_sz,
-                    type_="Dense",
+                    type_="Dense+Mask",
                     input_size=input_size,
                     output_size=output_size,
                 )
-                sparse_total_params, sparse_time = train_n_batch_only_(
-                    batch_sz=batch_sz,
-                    type_="Snack",
-                    sparsity=sparsity,
-                    input_size=input_size,
-                    output_size=output_size,
-                )
-                data.append(
-                    {
-                        "isSparse": "Snack",
-                        "batch_size": batch_sz,
-                        "dense_level": f"{input_size}x{output_size}",
-                        "cuda_elapsed_time": sparse_time,
-                        "total_params": sparse_total_params,
-                        "sparsity_level": sparsity,
-                        "rep": rep,
-                    }
-                )
+                # sparse_total_params, sparse_time, gpu_df = train_n_batch_only_(
+                #     batch_sz=batch_sz,
+                #     type_="Snack",
+                #     sparsity=sparsity,
+                #     input_size=input_size,
+                #     output_size=output_size,
+                # )
+                # data.append(
+                #     {
+                #         "isSparse": "Snack",
+                #         "batch_size": batch_sz,
+                #         "dense_level": f"{input_size}x{output_size}",
+                #         "cuda_elapsed_time": sparse_time,
+                #         "energy_spent_per_second": gpu_df["Cumulative Energy (Wh)"].iloc[-1] / sparse_time,
+                #         "total_params": sparse_total_params,
+                #     }
+                # )
                 data.append(
                     {
                         "isSparse": "Dense",
@@ -107,10 +104,18 @@ def train_n_batch_only():
                         "dense_level": f"{input_size}x{output_size}",
                         "cuda_elapsed_time": dense_time,
                         "total_params": dense_total_params,
-                        "sparsity_level": sparsity,
-                        "rep": rep,
+                        "energy_spent_per_second": gpu_df["Cumulative Energy (Wh)"].iloc[-1] / dense_time,
                     }
                 )
+                data[-1].update({
+                    "sparsity_level": sparsity,
+                    "rep": rep,
+                    "energy_spent": gpu_df["Cumulative Energy (Wh)"].iloc[-1],
+
+                    "average_power_used": gpu_df["Power (W)"],
+                    "average_utilization": gpu_df["Utilization (%)"].mean(),
+                    "average_memory_used": gpu_df["Memory Used (MB)"].mean(),
+                })
 
                 df = pd.DataFrame.from_records(data)
                 df.to_csv("DST/log.csv", index=False)

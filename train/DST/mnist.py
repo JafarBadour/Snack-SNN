@@ -7,6 +7,8 @@ from torch.utils.data import DataLoader
 
 from DST.layers.Snack import Snack
 from DST.initializers.fixed_degree import FixedDegreeRandomInitializer
+from benchmark.gpu.profiler import GPUAsyncProfiler
+
 
 input_size = 28
 output_size = 28
@@ -69,6 +71,7 @@ def train(type_: str, batch_size: int, sparsity: float = 0):
     class NeuralNet(nn.Module):
         def __init__(self):
             super(NeuralNet, self).__init__()
+
             if type_ == "Snack":
 
                 self.fc1 = Snack(
@@ -85,8 +88,7 @@ def train(type_: str, batch_size: int, sparsity: float = 0):
                     initializer=FixedDegreeRandomInitializer,
                     device="cuda",
                 )
-                self.fc1 = FC1
-                self.fc2 = FC2
+
 
             elif type_ == "Dense":
 
@@ -97,7 +99,8 @@ def train(type_: str, batch_size: int, sparsity: float = 0):
                 self.fc2 = DenseLayer(128, 10)
                 self.fc2.weights.data = FC2.get_sp().dense().detach().clone().t()
                 self.fc2.bias.data = FC2.bias.data.detach().clone()
-
+            else:
+                raise NotImplementedError("Not supported model type")
         def forward(self, x):
             x = x.view(-1, 28 * 28)  # Flatten input
 
@@ -106,9 +109,11 @@ def train(type_: str, batch_size: int, sparsity: float = 0):
             return x
 
     model = NeuralNet().to(device)
+    prof = GPUAsyncProfiler(0.2)
 
     # Define loss function and optimizer
     criterion = nn.CrossEntropyLoss()
+    # print(list(model.parameters()))
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     # Training loop
@@ -158,5 +163,11 @@ def train(type_: str, batch_size: int, sparsity: float = 0):
 
 
 if __name__ == "__main__":
-    # train("Dense", 128)
-    train("Snack", 128, sparsity=0.88)
+
+    from benchmark.gpu.profiler import GPUAsyncProfiler
+
+    prof = GPUAsyncProfiler(0.2)
+    #prof.start_benchmark()
+    train("Dense", 128)
+    # train("Snack", 128, sparsity=0)
+    # df = prof.stop_benchmark()

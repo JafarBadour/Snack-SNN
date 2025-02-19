@@ -155,6 +155,7 @@ class Snack(torch.nn.Module):
 
     def __repr__(self):
         return self.__str__()
+
     def __del__(self):
         del self.values
         del self.indices_b

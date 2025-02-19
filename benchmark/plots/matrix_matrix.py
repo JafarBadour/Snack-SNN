@@ -10,14 +10,16 @@ def plt_them(df_dlvl, ax=None, tot=4, x_title=None, log=False, title=""):
 
     max_avg_ct_ = 0
     min_avg_ct_ = np.inf
-    unique_keys = df_dlvl["SparseType"].unique().tolist()
-    colors = plt.cm.tab10.colors  # Assign colors per SparseType
+    unique_keys = df_dlvl["Type"].unique().tolist()
+    colors = plt.cm.tab10.colors  # Assign colors per Type
     color_map = {
-        category: colors[i] for i, category in enumerate(["JaxSparse", "SparseTorch", "SparseUT", "Dense", "Sparse"])
+        category: colors[i] for i, category in enumerate(["JaxSparse", "SparseTorch", "SparseUT", "Dense", "Snack"])
     }
-    idx_map = {category: i for i, category in enumerate(["JaxSparse", "SparseTorch", "SparseUT", "Dense", "Sparse"])}
+    idx_map = {category: i for i, category in enumerate(["JaxSparse", "SparseTorch", "SparseUT", "Dense", "Snack"])}
+    color_map["Dense+Mask"] = color_map["Dense"]
+    idx_map["Dense+Mask"] = idx_map["Dense"]
 
-    for is_sparse, group_sparse in df_dlvl.groupby("SparseType"):
+    for is_sparse, group_sparse in df_dlvl.groupby("Type"):
         for batch_size, group_batch in group_sparse.groupby("batch_size"):
             avg_per_sparsity = group_batch.groupby("sparsity_level")["cuda_elapsed_time"].mean() * 10
             std_per_sparsity = group_batch.groupby("sparsity_level")["cuda_elapsed_time"].std() * 10
@@ -74,13 +76,13 @@ def plt_them(df_dlvl, ax=None, tot=4, x_title=None, log=False, title=""):
     ax.set_xlabel("Sparsity Level")
     ax.set_ylabel(x_title or "Cuda Time (in microseconds)")
 
-    # Custom legend for SparseType categories
+    # Custom legend for Type categories
     handles = [
-        plt.Line2D([0], [0], color=color_map[cat], lw=2, label=f"SparseType={cat}")
+        plt.Line2D([0], [0], color=color_map[cat], lw=2, label=f"{cat}")
         for cat in color_map.keys()
         if cat in unique_keys
     ]
-    ax.legend(handles=handles, title="Multiplication Type", loc="upper right", fontsize=9)
+    ax.legend(handles=handles, title="Type", loc="upper right", fontsize=9)
 
     return ax
 
@@ -95,13 +97,13 @@ def create_multi_plot_for_batches(df, dense_level, BATCHES, log=False):
     plt.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.7)
 
     # Group by the 'category' column and plot each group
-    df_dlvl = df_dlvl[df_dlvl.SparseType != "SparseTorch"]
+    df_dlvl = df_dlvl[df_dlvl.Type != "SparseTorch"]
     plt_them(df_dlvl, ax=ax[1])
 
     plt.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.7)
 
     # Group by the 'category' column and plot each group
-    df_dlvl = df_dlvl[~df_dlvl.SparseType.isin(["SparseTorch", "JaxSparse"])]
+    df_dlvl = df_dlvl[~df_dlvl.Type.isin(["SparseTorch", "JaxSparse"])]
     plt_them(df_dlvl, ax[2])
     plt.show()
 
