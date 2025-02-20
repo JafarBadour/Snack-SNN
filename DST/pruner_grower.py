@@ -31,9 +31,13 @@ class ZetaPrunerGrower:
 
         nz = int(self.zeta * self.indices.size(0))
         if init != "uni_init":
-            raise NotImplementedError(f"Initializer of type {init} is not implemented yet")
+            raise NotImplementedError(
+                f"Initializer of type {init} is not implemented yet"
+            )
 
-        new_indices = uni_init.init_without_replacement(self.model.size[0], self.model.size[1], nz, indices.cpu())
+        new_indices = uni_init.init_without_replacement(
+            self.model.size[0], self.model.size[1], nz, indices.cpu()
+        )
         new_indices = new_indices.to(device)
         _, idxs = torch.topk(indices, nz, largest=False)
         msk = torch.ones_like(indices, dtype=torch.bool)

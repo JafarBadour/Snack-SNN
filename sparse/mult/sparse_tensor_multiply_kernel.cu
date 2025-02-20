@@ -65,7 +65,6 @@ torch::Tensor sparse_multiply_cuda(
         sparse_matrix_indices_a.data_ptr<unsigned short>(),
         sparse_matrix_indices_b.data_ptr<unsigned short>(), nnz3,
         output_values.data_ptr<float>(), sparseCols);
-
     return output_values;
 }
 
