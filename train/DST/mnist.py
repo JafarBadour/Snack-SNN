@@ -40,7 +40,7 @@ train_dataset = datasets.MNIST(root="./data", train=True, transform=transform, d
 test_dataset = datasets.MNIST(root="./data", train=False, transform=transform, download=True)
 
 
-def train(type_: str, batch_size: int, sparsity: float = 0):
+def train(type_: str, batch_size: int, hidden: int = 800, sparsity: float = 0, log=True):
     """
 
     :param batch_size:
@@ -54,13 +54,13 @@ def train(type_: str, batch_size: int, sparsity: float = 0):
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     FC1 = Snack(
         input_size * output_size,
-        128,
+        hidden,
         sparsity=sparsity,
         initializer=FixedDegreeRandomInitializer,
         device="cuda",
     )
     FC2 = Snack(
-        128,
+        hidden,
         10,
         sparsity=sparsity,
         initializer=FixedDegreeRandomInitializer,
@@ -76,19 +76,18 @@ def train(type_: str, batch_size: int, sparsity: float = 0):
 
                 self.fc1 = Snack(
                     input_size * output_size,
-                    128,
+                    hidden,
                     sparsity=sparsity,
                     initializer=FixedDegreeRandomInitializer,
                     device="cuda",
                 )
                 self.fc2 = Snack(
-                    128,
-                    10,
+                    hidden,
+                    hidden,
                     sparsity=sparsity,
                     initializer=FixedDegreeRandomInitializer,
                     device="cuda",
                 )
-
 
             elif type_ == "Dense":
 
@@ -101,11 +100,14 @@ def train(type_: str, batch_size: int, sparsity: float = 0):
                 self.fc2.bias.data = FC2.bias.data.detach().clone()
             else:
                 raise NotImplementedError("Not supported model type")
+            self.fc3 = nn.Linear(hidden, 10)
+
         def forward(self, x):
             x = x.view(-1, 28 * 28)  # Flatten input
 
             x = torch.relu(self.fc1(x))
-            x = self.fc2(x)
+            x = torch.relu(self.fc2(x))
+            x = self.fc3(x)
             return x
 
     model = NeuralNet().to(device)
@@ -137,14 +139,15 @@ def train(type_: str, batch_size: int, sparsity: float = 0):
                 total_params = sum(p.numel() for p in model.parameters())
                 trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
                 non_trainable_params = total_params - trainable_params
-                print(
-                    f"""
-                    =========================================
-                    Epoch {epoch + 1}/{epochs}, Batch {batch_idx}/{len(train_loader)}, 
-                    Loss: {loss_item:.4f} trainable/total params {trainable_params}/{total_params}
-                    =========================================
-                    """
-                )
+                if log:
+                    print(
+                        f"""
+                        =========================================
+                        Epoch {epoch + 1}/{epochs}, Batch {batch_idx}/{len(train_loader)}, 
+                        Loss: {loss_item:.4f} trainable/total params {trainable_params}/{total_params}
+                        =========================================
+                        """
+                    )
 
     # Evaluation
     model.eval()
@@ -159,15 +162,20 @@ def train(type_: str, batch_size: int, sparsity: float = 0):
             total += target.size(0)
             correct += (predicted == target).sum().item()
 
-    print(f"Test Accuracy: {100 * correct / total:.2f}%")
+    if log:
+        print(f"Test Accuracy: {100 * correct / total:.2f}%")
+    return correct / total
 
 
 if __name__ == "__main__":
 
     from benchmark.gpu.profiler import GPUAsyncProfiler
+    from tqdm import tqdm
 
     prof = GPUAsyncProfiler(0.2)
-    #prof.start_benchmark()
-    train("Dense", 128)
-    # train("Snack", 128, sparsity=0)
+    # prof.start_benchmark()
+    # train("Dense", 128)
+    for sparsity in tqdm([0, 0.15, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.96]):
+        acc = train("Snack", 128, sparsity=sparsity, log=False)
+        print(f"Acc(Snack(sparsity={sparsity})) = {acc}")
     # df = prof.stop_benchmark()
