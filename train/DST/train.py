@@ -78,7 +78,7 @@ def train_n_batch_only(output_file):
             [0, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 0.985, 0.99, 0.995],
             desc="Sparsity processing",
         ):
-            for batch_sz in tqdm([1, 2, 4, 8, 16, 32, 64, 128, 256, 512], desc="batch processing"):
+            for batch_sz in tqdm([1, 2, 4, 8, 16, 32, 64, 128], desc="batch processing"):
 
                 sparse_total_params, sparse_time, gpu_df = train_n_batch_only_(
                     batch_sz=batch_sz,
@@ -109,7 +109,7 @@ def train_n_batch_only(output_file):
 
 
     for rep in tqdm(list(range(1)), desc="Repeating"):
-        for batch_sz in tqdm([1, 2, 4, 8, 16, 32, 64, 128, 256, 512], desc="batch processing"):
+        for batch_sz in tqdm([1, 2, 4, 8, 16, 32, 64, 128], desc="batch processing"):
             for sparsity in tqdm(
                  [0, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 0.99],
                     desc="Sparsity processing",

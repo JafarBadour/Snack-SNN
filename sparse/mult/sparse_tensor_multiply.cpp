@@ -100,7 +100,8 @@ torch::Tensor random_init_without_replacement(
 
     int * built_edges_ptr = built_edges.data_ptr<int>();
     int maxy = 1 + (input_size > output_size) ? input_size : output_size;
-    for(int i=0;i<built_edges.size(0); i++){
+    for(int i=0;i<2*built_edges.size(0); i+=2){
+            //printf("%d %d");
             hashy[built_edges_ptr[i]][built_edges_ptr[i+1]] = 1;
     }
 
