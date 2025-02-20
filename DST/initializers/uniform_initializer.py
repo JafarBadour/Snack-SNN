@@ -5,12 +5,15 @@ from sparse_tensor_multiply import random_init_without_replacement
 
 class UniformInitializer(SparseInitializer):
 
-
-
     @classmethod
     def initialize(
-        cls, input_shape: int, output_shape: int, device="cpu", sparsity=0.9,
-            built_edges :torch.Tensor = torch.empty((0, 2))) -> torch.Tensor:
+        cls,
+        input_shape: int,
+        output_shape: int,
+        device="cpu",
+        sparsity=0.9,
+        built_edges: torch.Tensor = torch.empty((0, 2)),
+    ) -> torch.Tensor:
         """
 
         :param built_edges:
@@ -21,15 +24,11 @@ class UniformInitializer(SparseInitializer):
         :return:
         """
         if sparsity < 0.2:
-            raise ValueError(
-                "Sparsity is less 0.2 which is inefficient for the uniform initializer"
-            )
+            raise ValueError("Sparsity is less 0.2 which is inefficient for the uniform initializer")
 
         nz = int((1 - sparsity) * input_shape * output_shape)
 
-        return cls.init_without_replacement(input_shape, output_shape, nz, built_edges).to(
-            device
-        )
+        return cls.init_without_replacement(input_shape, output_shape, nz, built_edges).to(device)
 
     @classmethod
     def init_without_replacement(

@@ -46,9 +46,7 @@ def sparse_multiply(
     :return: result of multiplication of shape output_shape
     """
     if device == "cpu":
-        return sparse_multiply_cpu_(
-            oned_tensor, indices_a, indices_b, values, output_shape
-        )
+        return sparse_multiply_cpu_(oned_tensor, indices_a, indices_b, values, output_shape)
 
     # print(oned_tensor.shape)
     # print(values.shape)
@@ -71,11 +69,7 @@ class SparseTensor(torch.nn.Module):
     ) -> None:
         if len(args) != 0:
             raise ValueError("SparseTensor accepts only keywords arguments")
-        if (
-            device
-            and device.startswith("cuda")
-            and not (indices_a.is_cuda and indices_b.is_cuda and values.is_cuda)
-        ):
+        if device and device.startswith("cuda") and not (indices_a.is_cuda and indices_b.is_cuda and values.is_cuda):
             raise NotImplementedError(
                 f"device has to be None or cpu not {device}. to move to cuda use .cuda afterwards"
             )

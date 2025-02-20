@@ -42,9 +42,7 @@ def test_jax(
             # print("shapes ##")
             # print(sparse_matrix_gpu.shape)
             # print(vector_gpu.shape)
-            gpu_result = batched_sparse_mv(
-                sparse_matrix_gpu, vector_gpu
-            ).block_until_ready()
+            gpu_result = batched_sparse_mv(sparse_matrix_gpu, vector_gpu).block_until_ready()
             gpu_result = gpu_result / gpu_result.max()
             gpu_result = vector_gpu
         # check correctness
@@ -173,9 +171,7 @@ def test_sparse_torch(
         axis=0,
     )
 
-    sparse_tensor = torch.sparse_coo_tensor(
-        indices, sparse_matrix.values, sparse_matrix.matrix_shape, device="cuda"
-    )
+    sparse_tensor = torch.sparse_coo_tensor(indices, sparse_matrix.values, sparse_matrix.matrix_shape, device="cuda")
     del sparse_matrix
     torch.cuda.empty_cache()
 

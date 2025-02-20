@@ -27,8 +27,22 @@ torch::Tensor sparse_multiply(
 
     return sparse_multiply_cuda(activations, sparse_matrix_values, sparse_matrix_indices_a, sparse_matrix_indices_b, sparseCols);
 }
+torch::Tensor sparse_outer_product_multiply_cuda(
+    torch::Tensor left, torch::Tensor indices_left, torch::Tensor right,
+    torch::Tensor indices_right);
 
-
+torch::Tensor sparse_outer_product_multiply(
+    torch::Tensor left, torch::Tensor indices_left, torch::Tensor right,
+    torch::Tensor indices_right){
+    TORCH_CHECK(left.device().is_cuda(), "left must be a CUDA tensor");
+    TORCH_CHECK(indices_left.device().is_cuda(), "indices_left must be a CUDA tensor");
+    TORCH_CHECK(indices_right.device().is_cuda(), "indices_right must be a CUDA tensor");
+    TORCH_CHECK(right.device().is_cuda(), "right must be a CUDA tensor");
+    if(left.size(0) != right.size(0)){
+        throw std::runtime_error("left and right has different batch size");
+    }
+    return sparse_outer_product_multiply_cuda(left, indices_left, right, indices_right);
+ }
 
 torch::Tensor sparse_multiply_cpu(
     torch::Tensor activations, torch::Tensor sparse_matrix_values, torch::Tensor sparse_matrix_indices_a,
@@ -120,6 +134,7 @@ torch::Tensor random_init_without_replacement(
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("sparse_multiply", &sparse_multiply, "Sparse Tensor Multiplication (CUDA)");
     m.def("sparse_multiply_cpu", &sparse_multiply_cpu, "Sparse Tensor Multiplication (CPU)");
+    m.def("sparse_outer_product_multiply", &sparse_outer_product_multiply, "Sparse Outer Product (CUDA)");
 
     m.def("random_init_without_replacement", &random_init_without_replacement, "random_init_without_replacement");
 }
