@@ -1,3 +1,5 @@
+import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -84,7 +86,7 @@ def train(type_: str, batch_size: int, hidden: int = 800, sparsity: float = 0, l
                 )
                 self.fc2 = Snack(
                     hidden,
-                    hidden,
+                    10,
                     sparsity=sparsity,
                     initializer=FixedDegreeRandomInitializer,
                     device="cuda",
@@ -92,11 +94,11 @@ def train(type_: str, batch_size: int, hidden: int = 800, sparsity: float = 0, l
 
             elif type_ == "Dense":
 
-                self.fc1 = DenseLayer(input_size * output_size, 128)
+                self.fc1 = DenseLayer(input_size * output_size, hidden)
                 self.fc1.weights.data = FC1.get_sp().dense().t().detach().clone()
                 self.fc1.bias.data = FC1.bias.data.detach().clone()
 
-                self.fc2 = DenseLayer(128, 10)
+                self.fc2 = DenseLayer(hidden, 10)
                 self.fc2.weights.data = FC2.get_sp().dense().detach().clone().t()
                 self.fc2.bias.data = FC2.bias.data.detach().clone()
             else:
@@ -107,8 +109,8 @@ def train(type_: str, batch_size: int, hidden: int = 800, sparsity: float = 0, l
             x = x.view(-1, 28 * 28)  # Flatten input
 
             x = torch.relu(self.fc1(x))
-            x = torch.relu(self.fc2(x))
-            x = self.fc3(x)
+            x = self.fc2(x)
+            # x = self.fc3(torch.relu(x))
             return x
 
     model = NeuralNet().to(device)
@@ -120,11 +122,11 @@ def train(type_: str, batch_size: int, hidden: int = 800, sparsity: float = 0, l
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     # Training loop
-    epochs = 5
+    epochs = 25
 
     for epoch in range(epochs):
         model.train()
-        loss_item = None
+        loss_items = []
         for batch_idx, (data, target) in enumerate(train_loader):
             data, target = data.to(device), target.to(device)
 
@@ -133,28 +135,24 @@ def train(type_: str, batch_size: int, hidden: int = 800, sparsity: float = 0, l
             loss = criterion(output, target)
             loss.backward()
             loss_item = loss.item()
-
+            loss_items.append(loss_item)
             optimizer.step()
 
-            if batch_idx % 250 == 0:
-                total_params = sum(p.numel() for p in model.parameters())
-                trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-                non_trainable_params = total_params - trainable_params
-                if log:
-                    print(
-                        f"""
-                        =========================================
-                        Epoch {epoch + 1}/{epochs}, Batch {batch_idx}/{len(train_loader)}, 
-                        Loss: {loss_item:.4f} trainable/total params {trainable_params}/{total_params}
-                        =========================================
-                        """
-                    )
-                if type_ == "Snack" and enable_dst:
-                    # DST here
-                    for sn in [model.fc1, model.fc2]:
-                        pruner_grower = ZetaPrunerGrower(sn, zeta=0.1)
-                        pruner_grower.prune()
-                        pruner_grower.regrow(init=UniformInitializer, device="cuda")
+        if log:
+            total_params = sum(p.numel() for p in model.parameters())
+            trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+            non_trainable_params = total_params - trainable_params
+
+            print(
+                f"Epoch {epoch + 1}/{epochs}, Loss: {np.array(loss_items).mean():.4f} trainable/total params {trainable_params}/{total_params}"
+            )
+        if type_ == "Snack" and enable_dst and epoch % 5 == 0 and epoch <= 15:
+            # DST here
+            for sn in [model.fc1, model.fc2]:
+                pruner_grower = ZetaPrunerGrower(sn, zeta=0.05)
+                pruner_grower.prune()
+                pruner_grower.regrow(init=UniformInitializer, device="cuda")
+
 
     # Evaluation
     model.eval()
@@ -183,8 +181,16 @@ if __name__ == "__main__":
     # prof.start_benchmark()
     # train("Dense", 128)
 
-    for sparsity in tqdm([0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.96, 0.97, 0.98, 0.99, 0.995]):
+    acc = train("Dense", 128, log=True)
+    data = [{"Type": "Dense", "acc": acc, "sparsity_level": -1, "DST or Static": False}]
+    pd.DataFrame.from_records(data).to_csv("DST/log_mnist.csv", index=False)
+    for sparsity in tqdm([
+        0.3, 0.5, 0.7, 0.8,
+        0.9, 0.95, 0.96,
+        0.97, 0.98, 0.99, 0.995]):
         for enable_dst in [True, False]:
-            acc = train("Snack", 128, sparsity=sparsity, log=False, enable_dst=enable_dst)
+            acc = train("Snack", 128, sparsity=sparsity, log=True, enable_dst=enable_dst)
             print(f"Acc(Snack(sparsity={sparsity}, enable_dst={enable_dst})) = {acc}")
+            data.append({"Type" : "Snack", "acc" : acc, "sparsity_level" : sparsity , "DST or Static" : enable_dst})
+            pd.DataFrame.from_records(data).to_csv("DST/log_mnist.csv", index=False)
     # df = prof.stop_benchmark()

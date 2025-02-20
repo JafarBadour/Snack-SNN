@@ -1,5 +1,6 @@
 import torch
 import typing
+import math
 
 from DST.layers.Snack import Snack
 import DST.initializers.uniform_initializer as uni_init
@@ -51,4 +52,7 @@ class ZetaPrunerGrower:
 
         indices_a.data = torch.concat([indices_a, new_indices[:, 0]])
         indices_b.data = torch.concat([indices_b, new_indices[:, 1]])
-        values.data = torch.concat([values.data, torch.randn(nz, device=device)])
+        # v_mean = values.mean()
+        a = -1 * math.sqrt(6) / math.sqrt(sum(self.layer.size)) # Xavier Initialization
+        b = a * -1
+        values.data = torch.concat([values.data, a + (b-a) * torch.rand(nz, device=device) ])
