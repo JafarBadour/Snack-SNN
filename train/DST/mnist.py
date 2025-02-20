@@ -154,8 +154,7 @@ def train(type_: str, batch_size: int, hidden: int = 800, sparsity: float = 0, l
                     for sn in [model.fc1, model.fc2]:
                         pruner_grower = ZetaPrunerGrower(sn, zeta=0.1)
                         pruner_grower.prune()
-                        pruner_grower.regrow(init=UniformInitializer, device='cuda')
-
+                        pruner_grower.regrow(init=UniformInitializer, device="cuda")
 
     # Evaluation
     model.eval()
@@ -184,7 +183,7 @@ if __name__ == "__main__":
     # prof.start_benchmark()
     # train("Dense", 128)
 
-    for sparsity in tqdm([ 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.96, 0.97, 0.98, 0.99, 0.995]):
+    for sparsity in tqdm([0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.96, 0.97, 0.98, 0.99, 0.995]):
         for enable_dst in [True, False]:
             acc = train("Snack", 128, sparsity=sparsity, log=False, enable_dst=enable_dst)
             print(f"Acc(Snack(sparsity={sparsity}, enable_dst={enable_dst})) = {acc}")

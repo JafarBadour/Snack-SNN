@@ -4,7 +4,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def plt_them(df_dlvl, col, ax=None, tot=4, x_title=None, log=False, title="", batch_needed=False, suffix="", legend_place="upper right"):
+def plt_them(
+    df_dlvl,
+    col,
+    ax=None,
+    tot=4,
+    x_title=None,
+    log=False,
+    title="",
+    batch_needed=False,
+    suffix="",
+    legend_place="upper right",
+):
     if ax is None:
         fig, ax = plt.subplots(figsize=(8, 6))
 
@@ -74,7 +85,7 @@ def plt_them(df_dlvl, col, ax=None, tot=4, x_title=None, log=False, title="", ba
             ax.set_yticklabels([f"{t:0.1f}" for t in yticks])  # Custom labels with time units
 
     else:
-        yticks=ax.set_yticks(np.linspace(0, max_avg_ct_, 10))
+        yticks = ax.set_yticks(np.linspace(0, max_avg_ct_, 10))
 
     ax.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.7)
 
@@ -136,7 +147,17 @@ def create_single_plot_for_batches(
     df_dlvl = df[(df.dense_level == dense_level) & (df.batch_size.isin(BATCHES))]
     df_dlvl[col] = df_dlvl[col]  # .apply(lambda x: np.log2(x))
     plt.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.7)
-    ax = plt_them(df_dlvl, col, ax=ax, x_title=x_label, log=log, title=title, batch_needed=batch_needed, suffix=suffix, legend_place=legend_place)
+    ax = plt_them(
+        df_dlvl,
+        col,
+        ax=ax,
+        x_title=x_label,
+        log=log,
+        title=title,
+        batch_needed=batch_needed,
+        suffix=suffix,
+        legend_place=legend_place,
+    )
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
     return fig

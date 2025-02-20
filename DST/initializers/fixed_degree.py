@@ -23,4 +23,3 @@ class FixedDegreeRandomInitializer(SparseInitializer):
             res[i * degree : i * degree + degree, 0] = i
             res[i * degree : i * degree + degree, 1] = torch.randperm(output_shape)[:degree]
         return res.to(device)
-

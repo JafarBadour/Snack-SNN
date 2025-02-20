@@ -25,7 +25,7 @@ class UniformInitializer(SparseInitializer):
         :return:
         """
 
-        if (nz is None and sparsity < 0.2) or ((1 - (nz+built_edges.size(0))/(input_shape*output_shape)) < 0.2) :
+        if (nz is None and sparsity < 0.2) or ((1 - (nz + built_edges.size(0)) / (input_shape * output_shape)) < 0.2):
             raise ValueError("Sparsity is less 0.2 which is inefficient for the uniform initializer")
 
         if nz is None:
