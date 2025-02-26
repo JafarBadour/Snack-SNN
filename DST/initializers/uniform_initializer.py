@@ -12,6 +12,7 @@ class UniformInitializer(SparseInitializer):
         output_shape: int,
         device="cpu",
         sparsity=0.9,
+        nz=None,
         built_edges: torch.Tensor = torch.empty((0, 2)),
     ) -> torch.Tensor:
         """
@@ -23,10 +24,12 @@ class UniformInitializer(SparseInitializer):
         :param sparsity: here is how empty the tensor is
         :return:
         """
-        if sparsity < 0.2:
+
+        if (nz is None and sparsity < 0.2) or ((1 - (nz + built_edges.size(0)) / (input_shape * output_shape)) < 0.2):
             raise ValueError("Sparsity is less 0.2 which is inefficient for the uniform initializer")
 
-        nz = int((1 - sparsity) * input_shape * output_shape)
+        if nz is None:
+            nz = int((1 - sparsity) * input_shape * output_shape)
 
         return cls.init_without_replacement(input_shape, output_shape, nz, built_edges).to(device)
 
@@ -39,6 +42,7 @@ class UniformInitializer(SparseInitializer):
         excluded_edges: torch.Tensor,
         device="cpu",
     ):
+
         ee = excluded_edges.to(dtype=torch.int32)
         return random_init_without_replacement(input_shape, output_shape, nz, ee)
 
