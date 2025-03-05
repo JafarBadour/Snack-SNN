@@ -26,9 +26,9 @@ def plt_them(
     colors = plt.cm.tab10.colors  # Assign colors per Type
     if len(categories) == 0:
         color_map = {
-            category: colors[i] for i, category in enumerate(["Dense", "Snack", "JaxSparse", "SparseTorch", "SparseUT"])
+            category: colors[i] for i, category in enumerate(["Dense", "Snack", "JaxSparse", "SparseTorch", "SparseUT", "Dense (Only)"])
         }
-        idx_map = {category: i for i, category in enumerate(["Dense", "Snack", "JaxSparse", "SparseTorch", "SparseUT"])}
+        idx_map = {category: i for i, category in enumerate(["Dense", "Snack", "JaxSparse", "SparseTorch", "SparseUT", "Dense (Only)"])}
         color_map["Dense+Mask"] = color_map["Dense"]
         idx_map["Dense+Mask"] = idx_map["Dense"]
     else:
@@ -96,6 +96,7 @@ def plt_them(
 
     else:
         yticks = ax.set_yticks(np.linspace(0, max_avg_ct_, 10))
+
 
     ax.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.7)
 
@@ -172,4 +173,5 @@ def create_single_plot_for_batches(
     )
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
+
     return fig
