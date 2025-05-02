@@ -15,6 +15,7 @@ def plt_them(
     batch_needed=False,
     suffix="",
     legend_place="upper right",
+    categories=[]
 ):
     if ax is None:
         fig, ax = plt.subplots(figsize=(8, 6))
@@ -23,12 +24,21 @@ def plt_them(
     min_avg_ct_ = np.inf
     unique_keys = df_dlvl["Type"].unique().tolist()
     colors = plt.cm.tab10.colors  # Assign colors per Type
-    color_map = {
-        category: colors[i] for i, category in enumerate(["Dense", "Snack", "JaxSparse", "SparseTorch", "SparseUT"])
-    }
-    idx_map = {category: i for i, category in enumerate(["Dense", "Snack", "JaxSparse", "SparseTorch", "SparseUT"])}
-    color_map["Dense+Mask"] = color_map["Dense"]
-    idx_map["Dense+Mask"] = idx_map["Dense"]
+    if len(categories) == 0:
+        color_map = {
+            category: colors[i] for i, category in enumerate(["Dense", "Snack", "JaxSparse", "SparseTorch", "SparseUT", "Dense (Only)"])
+        }
+        idx_map = {category: i for i, category in enumerate(["Dense", "Snack", "JaxSparse", "SparseTorch", "SparseUT", "Dense (Only)"])}
+        color_map["Dense+Mask"] = color_map["Dense"]
+        idx_map["Dense+Mask"] = idx_map["Dense"]
+    else:
+        color_map = {
+            category: colors[i] for i, category in enumerate(categories)
+        }
+        idx_map = {category: i for i, category in enumerate(categories)}
+        df_dlvl = df_dlvl[df_dlvl.Type.isin(categories)]
+
+
 
     for is_sparse, group_sparse in df_dlvl.groupby("Type"):
         for batch_size, group_batch in group_sparse.groupby("batch_size" if batch_needed else "Type"):
@@ -87,6 +97,7 @@ def plt_them(
     else:
         yticks = ax.set_yticks(np.linspace(0, max_avg_ct_, 10))
 
+
     ax.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.7)
 
     ax.set_title(title)
@@ -139,6 +150,7 @@ def create_single_plot_for_batches(
     batch_needed=False,
     suffix="",
     legend_place="upper right",
+    categories=[]
 ):
     fig = None
     if not ax:
@@ -157,7 +169,9 @@ def create_single_plot_for_batches(
         batch_needed=batch_needed,
         suffix=suffix,
         legend_place=legend_place,
+        categories=categories
     )
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
+
     return fig

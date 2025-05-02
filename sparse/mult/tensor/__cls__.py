@@ -159,7 +159,7 @@ class SparseTensor(torch.nn.Module):
         indices_a = self.indices_a.to(device)
         indices_b = self.indices_b.to(device)
         values = self.values.to(device)
-        self.device = device
+
         return SparseTensor.__new_obj__(
             indices_a=indices_a,
             indices_b=indices_b,

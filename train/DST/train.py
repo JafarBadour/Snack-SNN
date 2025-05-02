@@ -1,7 +1,7 @@
 import numpy as np
 from tqdm import tqdm
 import pandas as pd
-from DST.layers import Snack, Dense
+from DST.layers import Snack, MaskedDense
 from benchmark.gpu.profiler import GPUAsyncProfiler
 from DST.initializers.fixed_degree import FixedDegreeRandomInitializer
 
@@ -12,7 +12,7 @@ input_size = 10000
 output_size = 10000
 
 
-def train_n_batch_only_(input_size, output_size, batch_sz, type_, sparsity=0):
+def train_n_batch_only_(input_size, output_size, batch_sz, type_, sparsity=0, mask_enabled=True):
     import random
     import torch
 
@@ -29,7 +29,7 @@ def train_n_batch_only_(input_size, output_size, batch_sz, type_, sparsity=0):
             debug=True,
         ).cuda()
     else:
-        model = Dense(input_size, output_size).cuda()
+        model = MaskedDense(input_size, output_size, mask_enabled=mask_enabled).cuda()
 
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
     criterion = torch.nn.MSELoss()
@@ -75,6 +75,39 @@ def train_n_batch_only(output_file):
     data = []
 
     for rep in tqdm(list(range(1)), desc="Repeating"):
+        for batch_sz in tqdm([1, 2, 4, 8, 16, 32, 64, 128], desc="batch processing"):
+            for sparsity in tqdm(
+                [0, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 0.99],
+                desc="Sparsity processing",
+            ):
+                for mask_enabled in [True, False]:
+                    dense_total_params, dense_time, gpu_df = train_n_batch_only_(
+                        batch_sz=batch_sz,
+                        type_="Dense+Mask",
+                        input_size=input_size,
+                        output_size=output_size,
+                        mask_enabled=mask_enabled
+                    )
+                    data.append(
+                        {
+                            "isSparse": "Dense+Mask" if mask_enabled else "Dense (Only)",
+                            "batch_size": batch_sz,
+                            "dense_level": f"{input_size}x{output_size}",
+                            "cuda_elapsed_time": dense_time,
+                            "total_params": dense_total_params,
+                            "energy_spent_per_second": gpu_df["Cumulative Energy (Wh)"].iloc[-1] / dense_time,
+                            "sparsity_level": sparsity,
+                            "rep": rep,
+                            "energy_spent": gpu_df["Cumulative Energy (Wh)"].iloc[-1],
+                            "average_power_used": gpu_df["Power (W)"].mean(),
+                            "average_utilization": gpu_df["Utilization (%)"].mean(),
+                            "average_memory_used": gpu_df["Memory Used (MB)"].mean(),
+                        }
+                    )
+
+                    df = pd.DataFrame.from_records(data)
+                    df.to_csv(output_file, index=False)
+    for rep in tqdm(list(range(1)), desc="Repeating"):
         for sparsity in tqdm(
             [0, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 0.985, 0.99, 0.995],
             desc="Sparsity processing",
@@ -108,37 +141,6 @@ def train_n_batch_only(output_file):
                 df = pd.DataFrame.from_records(data)
                 df.to_csv(output_file, index=False)
 
-    for rep in tqdm(list(range(1)), desc="Repeating"):
-        for batch_sz in tqdm([1, 2, 4, 8, 16, 32, 64, 128], desc="batch processing"):
-            for sparsity in tqdm(
-                [0, 0.2, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98, 0.99],
-                desc="Sparsity processing",
-            ):
-                dense_total_params, dense_time, gpu_df = train_n_batch_only_(
-                    batch_sz=batch_sz,
-                    type_="Dense+Mask",
-                    input_size=input_size,
-                    output_size=output_size,
-                )
-                data.append(
-                    {
-                        "isSparse": "Dense+Mask",
-                        "batch_size": batch_sz,
-                        "dense_level": f"{input_size}x{output_size}",
-                        "cuda_elapsed_time": dense_time,
-                        "total_params": dense_total_params,
-                        "energy_spent_per_second": gpu_df["Cumulative Energy (Wh)"].iloc[-1] / dense_time,
-                        "sparsity_level": sparsity,
-                        "rep": rep,
-                        "energy_spent": gpu_df["Cumulative Energy (Wh)"].iloc[-1],
-                        "average_power_used": gpu_df["Power (W)"].mean(),
-                        "average_utilization": gpu_df["Utilization (%)"].mean(),
-                        "average_memory_used": gpu_df["Memory Used (MB)"].mean(),
-                    }
-                )
-
-                df = pd.DataFrame.from_records(data)
-                df.to_csv(output_file, index=False)
 
 
 if __name__ == "__main__":
