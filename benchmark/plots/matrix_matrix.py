@@ -36,6 +36,7 @@ def plt_them(
             category: colors[i] for i, category in enumerate(categories)
         }
         idx_map = {category: i for i, category in enumerate(categories)}
+
         df_dlvl = df_dlvl[df_dlvl.Type.isin(categories)]
 
 
@@ -158,6 +159,7 @@ def create_single_plot_for_batches(
 
     df_dlvl = df[(df.dense_level == dense_level) & (df.batch_size.isin(BATCHES))]
     df_dlvl[col] = df_dlvl[col]  # .apply(lambda x: np.log2(x))
+
     plt.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.7)
     ax = plt_them(
         df_dlvl,

@@ -71,11 +71,14 @@ class Snack(torch.nn.Module):
         self,
         input_size,
         output_size,
-        sparsity,
+        sparsity=None,
+        dense_weight: torch.Tensor = None,
+        bias: bool = True,
         values: torch.Tensor = None,
         initializer: typing.Type[SparseInitializer] = None,
         device="cuda",
         debug=False,
+
     ):
         """
 
@@ -87,23 +90,34 @@ class Snack(torch.nn.Module):
         """
         super(Snack, self).__init__()
         self.size = (input_size, output_size)
-        self.bias = torch.randn(output_size).to(device).float()
+        if bias:
+            self.bias = torch.randn(output_size).to(device).float()
+        else:
+            self.bias = torch.zeros(output_size).to(device).float()
+
         self.device = device
         if not (1 > sparsity >= 0):
             raise ValueError("Sparsity is out of range [0, 1[")
         self.sparsity = sparsity
-        if initializer is None:
+        if initializer is None and dense_weight is None:
             raise TypeError(
                 """initializer cannot be None you can use 
             `DST.initializers.uniform_initializer.UniformInitializer` or others in the initializers subdirectory"""
             )
 
-        if not issubclass(initializer, SparseInitializer):
+        if not issubclass(initializer, SparseInitializer) and dense_weight is None:
             raise TypeError("""initializer Must implement SparseInitializer""")
 
-        self.indices_a, self.indices_b, self.values = self.__init__weights(
-            initializer, input_size, output_size, sparsity
-        )
+        if dense_weight is not None:
+            # Convert dense weight to sparse representation
+            nonzero_indices = torch.nonzero(dense_weight, as_tuple=True)
+            self.indices_a = nonzero_indices[0]
+            self.indices_b = nonzero_indices[1] 
+            self.values = dense_weight[nonzero_indices]
+        else:
+            self.indices_a, self.indices_b, self.values = self.__init__weights(
+                initializer, input_size, output_size, sparsity
+            )
         self.indices_a = torch.nn.Parameter(self.indices_a.to(device), requires_grad=False)
         self.indices_b = torch.nn.Parameter(self.indices_b.to(device), requires_grad=False)
         if values is not None:

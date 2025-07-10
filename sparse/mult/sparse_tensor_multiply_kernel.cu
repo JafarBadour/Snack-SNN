@@ -69,6 +69,45 @@ torch::Tensor sparse_multiply_cuda(
 }
 
 
+__global__ void sparse_warp_csr_multiply_kernel(
+    const float* activations, 
+    int activation_len,
+    int activation_batch_sz,
+    const float* sparse_matrix_values, 
+    const unsigned int* sparse_matrix_indptr,
+    const unsigned int* sparse_matrix_indices,
+    const int sparse_matrix_nnz, // nnz
+    float* output_values, 
+    int sparseCols, 
+    int sparseRows) {
+
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    int batch_idx = blockIdx.y;
+
+    
+    
+}
+
+torch::Tensor sparse_warp_csr_multiply_cuda(
+    torch::Tensor activations, torch::Tensor sparse_matrix_values, torch::Tensor sparse_matrix_indptr,
+    torch::Tensor sparse_matrix_indices, int64_t sparseCols, int64_t sparseRows) {
+
+    int sparse_matrix_nnz = sparse_matrix_indices.size(0);
+    int activation_len = activations.size(-1);
+    int activation_batch_sz = activations.numel() / activation_len; // effectively batch size
+
+    TORCH_CHECK(activation_len % activation_batch_sz == 0, "activations tensor is corrupted");
+    
+    auto output_values = torch::zeros({sparseRows, sparseCols}, torch::dtype(torch::kFloat32).device(torch::kCUDA));
+    const int threads = MAX_THREADS; // this was 256
+    dim3 blocks((sparse_matrix_nnz + threads - 1) / threads, activation_batch_sz);
+    
+    return output_values;
+}
+
+
+
 __global__ void sparse_outer_product_multiply_kernel(
     const float* left, int left_len,
     const unsigned short* indices_left,
