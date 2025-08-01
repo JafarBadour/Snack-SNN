@@ -22,22 +22,24 @@ TESTING_DEVICE = "cuda"  # "cuda"
 sparsity_levels = (
     # list(range(0, 50, 24)) +
     # list(range(50, 80, 10))+
-     list(range(80, 96, 5))
-    + [96, 97, 98, 99, 99.5, 99.9]
+    #  list(range(80, 96, 5))
+    # + [96, 97, 98, 99, 99.5, 99.9]
+    [95]
 )
 
 # dense level is layer A with layer B that are after one another in the model architecture
 dense_levels = {
-    # "500x500": {"Reps": 5},
-     "1000x1000": {"Reps": 5},
-    # "5000x5000": {"Reps": 5},
-    #"5200x5200": {"Reps": 5},
-    # "40000x10000" : {'Reps' : 10},
-    # "10000x10000" : {'Reps' : 10},
+    "500x500": {"Reps": 2},
+     "1000x1000": {"Reps": 2},
+    "5000x5000": {"Reps": 2},
+    # "7500x7500": {"Reps": 2},
+    # "8500x8500": {"Reps": 2},
+    "10000x10000" : {'Reps' : 2},
+    # "15000x15000" : {'Reps' : 2},
 }
 
-csv_name = "log_mult_incl_cupy"
-batches_cnt = [1 << i for i in range(1, 15)]
+csv_name = "aug-1-log_mult_incl_cupy"
+batches_cnt = [1]
 
 import warnings
 
@@ -46,7 +48,7 @@ warnings.filterwarnings("ignore")
 
 
 method_dict = dict(
-    test_sparse_cupy=test_sparse_cupy,
+    test_sparse_cupy=test_sparse_cupy, #
     test_jax=test_jax,
     test_sparse_ut=test_sparse_ut,
     test_sparse_torch=test_sparse_torch,
@@ -81,7 +83,11 @@ def benchmark(method_name : str):
                     batsh_sz=BATCH_SIZE,
                 )
                 caller : typing.Callable = method_dict[method_name]
-                caller(**kwargs)
+                try:
+                    caller(**kwargs)
+                except Exception as e:
+                    print(e)
+                    continue
 
                 df = pd.DataFrame(log)
 
