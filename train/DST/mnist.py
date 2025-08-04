@@ -13,8 +13,8 @@ from DST.pruner_grower import ZetaPrunerGrower
 from benchmark.gpu.profiler import GPUAsyncProfiler
 
 
-input_size = 28
-output_size = 28
+# input_size = 28
+# output_size = 28
 
 
 class DenseLayer(nn.Module):
@@ -43,7 +43,7 @@ train_dataset = datasets.MNIST(root="./data", train=True, transform=transform, d
 test_dataset = datasets.MNIST(root="./data", train=False, transform=transform, download=True)
 
 
-def train(type_: str, batch_size: int, hidden: int = 800, sparsity: float = 0, log=True, enable_dst=False):
+def train(input_size, output_size,type_: str, batch_size: int, hidden: int = 800, sparsity: float = 0, log=True, enable_dst=False):
     """
 
     :param batch_size:
@@ -55,20 +55,20 @@ def train(type_: str, batch_size: int, hidden: int = 800, sparsity: float = 0, l
     # Define device
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-    FC1 = Snack(
-        input_size * output_size,
-        hidden,
-        sparsity=sparsity,
-        initializer=FixedDegreeRandomInitializer,
-        device="cuda",
-    )
-    FC2 = Snack(
-        hidden,
-        10,
-        sparsity=sparsity,
-        initializer=FixedDegreeRandomInitializer,
-        device="cuda",
-    )
+    # FC1 = Snack(
+    #     input_size * output_size,
+    #     hidden,
+    #     sparsity=sparsity,
+    #     initializer=FixedDegreeRandomInitializer,
+    #     device="cuda",
+    # )
+    # FC2 = Snack(
+    #     hidden,
+    #     10,
+    #     sparsity=sparsity,
+    #     initializer=FixedDegreeRandomInitializer,
+    #     device="cuda",
+    # )
 
     # Define the model
     class NeuralNet(nn.Module):
@@ -180,17 +180,24 @@ if __name__ == "__main__":
     prof = GPUAsyncProfiler(0.2)
     # prof.start_benchmark()
     # train("Dense", 128)
-
-    acc = train("Dense", 128, log=True)
-    data = [{"Type": "Dense", "acc": acc, "sparsity_level": -1, "DST or Static": False}]
-    pd.DataFrame.from_records(data).to_csv("DST/log_mnist.csv", index=False)
-    for sparsity in tqdm([
-        0.3, 0.5, 0.7, 0.8,
-        0.9, 0.95, 0.96,
-        0.97, 0.98, 0.99, 0.995]):
-        for enable_dst in [True, False]:
-            acc = train("Snack", 128, sparsity=sparsity, log=True, enable_dst=enable_dst)
-            print(f"Acc(Snack(sparsity={sparsity}, enable_dst={enable_dst})) = {acc}")
-            data.append({"Type" : "Snack", "acc" : acc, "sparsity_level" : sparsity , "DST or Static" : enable_dst})
+    for input_size in tqdm([32, 64, 128, 256, 512, 1024, 2048, 5000, 7500, 10000, 12500, 15000], desc="input_size"):
+        for mlp_dize in tqdm([32, 64, 128, 256, 512, 1024, 2048, 5000, 7500, 10000, 12500, 15000], desc="mlp_dize"):
+            try:
+                acc = train(input_size, mlp_dize, "Dense", 1, log=True)
+            except torch.cuda.OutOfMemoryError as e:
+                print(f"CUDA out of memory error: {e}")
+                torch.cuda.empty_cache()
+                continue
+            
+            data = [{"Type": "Dense", "acc": acc, "sparsity_level": -1, "DST or Static": False}]
             pd.DataFrame.from_records(data).to_csv("DST/log_mnist.csv", index=False)
+            for sparsity in tqdm([
+                0.3, 0.5, 0.7, 0.8,
+                0.9, 0.95, 0.96,
+                0.97, 0.98, 0.99, 0.995]):
+                for enable_dst in [True, False]:
+                    acc = train("Snack", 1, sparsity=sparsity, log=True, enable_dst=enable_dst)
+                    print(f"Acc(Snack(sparsity={sparsity}, enable_dst={enable_dst})) = {acc}")
+                    data.append({"Type" : "Snack", "acc" : acc, "sparsity_level" : sparsity , "DST or Static" : enable_dst})
+                    pd.DataFrame.from_records(data).to_csv("DST/log_mnist.csv", index=False)
     # df = prof.stop_benchmark()
