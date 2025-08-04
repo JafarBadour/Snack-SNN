@@ -260,6 +260,8 @@ def test_sparse_cupy(
     del sparse_matrix
     if csr:
         sparse_tensor = sparse_tensor.tocsr()
+        print(sparse_tensor.shape, sparse_tensor.nnz)
+        
     torch.cuda.empty_cache()
     ones = cp.asarray(ones.cpu().numpy())
     temp = ones @ sparse_tensor
@@ -280,7 +282,7 @@ def test_sparse_cupy(
         end_event.record()
         torch.cuda.synchronize()
         elapsed_time_ms = start_event.elapsed_time(end_event)
-
+        
         log.append(
             {
                 "isSparse": "CuPy Sparse CSR",

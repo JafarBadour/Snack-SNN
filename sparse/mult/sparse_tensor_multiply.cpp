@@ -131,9 +131,33 @@ torch::Tensor random_init_without_replacement(
     return res;
 }
 
+/////////////////////////////////////////
 
+torch::Tensor sparse_multiply_warp_csr_cuda(
+    torch::Tensor activations, torch::Tensor sparse_matrix_values, torch::Tensor sparse_matrix_indices_a,
+    torch::Tensor sparse_matrix_indices_b,
+    int64_t sparseCols // or next layer how many neurons
+    );
+
+
+torch::Tensor sparse_warp_csr_multiply(
+    torch::Tensor activations, torch::Tensor sparse_matrix_values, torch::Tensor sparse_matrix_indices_a,
+    torch::Tensor sparse_matrix_indices_b, int64_t sparseCols // or next layer how many neurons
+    ) {
+    // regular asserts
+    TORCH_CHECK(activations.device().is_cuda(), "activations must be a CUDA tensor");
+    TORCH_CHECK(sparse_matrix_values.device().is_cuda(), "sparse_matrix must be a CUDA tensor");
+    TORCH_CHECK(sparse_matrix_indices_a.device().is_cuda(), "sparse_matrix must be a CUDA tensor");
+    TORCH_CHECK(sparse_matrix_indices_b.device().is_cuda(), "sparse_matrix must be a CUDA tensor");
+
+
+    return sparse_multiply_cuda(activations, sparse_matrix_values, sparse_matrix_indices_a, sparse_matrix_indices_b, sparseCols);
+}
+/////////////////////////////////////////
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("sparse_multiply", &sparse_multiply, "Sparse Tensor Multiplication (CUDA)");
+
+    m.def("sparse_warp_csr_multiply", &sparse_warp_csr_multiply, "Sparse Tensor CSR WARPs Multiplication (CUDA)");
     m.def("sparse_multiply_cpu", &sparse_multiply_cpu, "Sparse Tensor Multiplication (CPU)");
     m.def("sparse_outer_product_multiply", &sparse_outer_product_multiply, "Sparse Outer Product (CUDA)");
 

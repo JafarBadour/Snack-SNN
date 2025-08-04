@@ -66,6 +66,7 @@ class SparseTensor(torch.nn.Module):
         values: torch.Tensor = None,
         matrix_shape: ty.Union[int, ty.Tuple[int]] = None,
         device: str = None,
+        backend: str = "COO",
     ) -> None:
         if len(args) != 0:
             raise ValueError("SparseTensor accepts only keywords arguments")
@@ -108,6 +109,10 @@ class SparseTensor(torch.nn.Module):
         self.values = values
         self.shape = self.shape_calc()
         self.device = device
+        if backend == "COO":
+            self.spmm = sparse_multiply
+        if backend == "CSR":
+            self.spmm = None
 
     def matmul(self, other: torch.Tensor):
         return self @ other
@@ -119,10 +124,23 @@ class SparseTensor(torch.nn.Module):
         :return:
         """
 
+        # if len(other.shape) > 2:
+        #     raise NotImplementedError(f"""Only 2-D tensor to be multiplied with the matrix: given {other.shape}""")
         if len(other.shape) > 2:
-            raise NotImplementedError("""Only 2-D tensor to be multiplied with the matrix""")
+            # TODO: this is extremely slow for 3D tensors
+            b, h, _ = other.shape
+            other = other.reshape(-1, other.shape[-1])
+            res = self.spmm(
+                other,
+                self.indices_a,
+                self.indices_b,
+                self.values,
+                self.matrix_shape[1],
+                self.device,
+            )
+            return res.reshape(b, h, -1)
 
-        return sparse_multiply(
+        return self.spmm(
             other,
             self.indices_a,
             self.indices_b,

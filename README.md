@@ -1,6 +1,6 @@
 # installing 
 
-after installing nvcc and cuda 12.6
+after installing nvcc and cuda 12.6 or 12.1
 
 ```
 conda create -p ./venv2 python=3.12.7
@@ -19,11 +19,12 @@ check this link to install cuda 12.6
 https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=22.04&target_type=deb_local```
 ```
 ```
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
+pip install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 ```
 
 
 ```
+# On windows
 set TORCH_INCLUDE=C:\Users\BadourJ\Arts\Parallel-Dynamic-Sparse-Training\venv2\Lib\site-packages\torch\include\torch
 ```
 
