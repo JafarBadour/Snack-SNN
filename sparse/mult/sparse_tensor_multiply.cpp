@@ -48,10 +48,12 @@ torch::Tensor conv2d_sparse_tensor_multiply(
 torch::Tensor sparse_outer_product_multiply(
     torch::Tensor left, torch::Tensor indices_left, torch::Tensor right,
     torch::Tensor indices_right){
+        
     TORCH_CHECK(left.device().is_cuda(), "left must be a CUDA tensor");
     TORCH_CHECK(indices_left.device().is_cuda(), "indices_left must be a CUDA tensor");
     TORCH_CHECK(indices_right.device().is_cuda(), "indices_right must be a CUDA tensor");
     TORCH_CHECK(right.device().is_cuda(), "right must be a CUDA tensor");
+
     if(left.size(0) != right.size(0)){
         throw std::runtime_error("left and right has different batch size");
     }

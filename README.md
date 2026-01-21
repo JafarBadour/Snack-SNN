@@ -110,3 +110,6 @@ connection from remote
 ```shell
 ssh -L 8888:localhost:8888 -p 2222 jafar@16.62.171.242
 ```
+
+# this is where you need to put the torch library path
+ export LD_LIBRARY_PATH=/home/$(whoami)$/anaconda3/lib/python3.12/site-packages/torch/lib:$LD_LIBRARY_PATH
