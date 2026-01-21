@@ -7,7 +7,7 @@ class CastingError(Exception):
         super().__init__(
             f"""
             Casting from type {inp_dtype} to {torch.int32} cannot be executed.
-            Refer to https://github.com/JafarBadour/Parallel-Dynamic-Sparse-Training
+            Refer to #URL DELETED FOR BLIND REVIEW
             
             stack {e.__traceback__}
         """

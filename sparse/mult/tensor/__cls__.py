@@ -96,7 +96,7 @@ class SparseTensor(torch.nn.Module):
         if len(matrix_shape) > 3:
             raise NotImplementedError(
                 """We support having only 2-D tensor output please raise a PR if you want to 
-            contribute: https://github.com/JafarBadour/Parallel-Dynamic-Sparse-Training/pull/"""
+            contribute: #URL DELETED FOR BLIND REVIEW"""
             )
         super(SparseTensor, self).__init__()
         if indices_a is None:

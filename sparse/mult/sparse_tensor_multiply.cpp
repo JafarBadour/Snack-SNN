@@ -31,6 +31,20 @@ torch::Tensor sparse_outer_product_multiply_cuda(
     torch::Tensor left, torch::Tensor indices_left, torch::Tensor right,
     torch::Tensor indices_right);
 
+// Conv2d sparse tensor multiply (defined in conv2d_sparse_tensor_multiply.cpp)
+torch::Tensor conv2d_sparse_tensor_multiply(
+    torch::Tensor input_feature_map, 
+    torch::Tensor sparse_filters_matrix_values,
+    torch::Tensor sparse_filters_matrix_indices_f,
+    torch::Tensor sparse_filters_matrix_indices_r,
+    torch::Tensor sparse_filters_matrix_indices_kw,
+    torch::Tensor sparse_filters_matrix_indices_kh,
+    int Kw,
+    int Kh,
+    int64_t filters_len,
+    int stride,
+    int padding);
+
 torch::Tensor sparse_outer_product_multiply(
     torch::Tensor left, torch::Tensor indices_left, torch::Tensor right,
     torch::Tensor indices_right){
@@ -162,6 +176,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("sparse_outer_product_multiply", &sparse_outer_product_multiply, "Sparse Outer Product (CUDA)");
 
     m.def("random_init_without_replacement", &random_init_without_replacement, "random_init_without_replacement");
+    
+    m.def("conv2d_sparse_tensor_multiply", &conv2d_sparse_tensor_multiply, "Conv2D Sparse Tensor Multiplication (CUDA)");
 }
 
 
