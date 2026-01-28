@@ -1,12 +1,16 @@
 cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 project(Parallel-Dynamic-Sparse-Training)
 
-
-set(CMAKE_PREFIX_PATH "/home/jafar/Downloads/libtorch/")
+# Set CMAKE_PREFIX_PATH to your libtorch installation directory
+# Example: set(CMAKE_PREFIX_PATH "$ENV{HOME}/Downloads/libtorch/")
+# Or set via environment variable: export CMAKE_PREFIX_PATH=/path/to/libtorch
+if(DEFINED ENV{CMAKE_PREFIX_PATH})
+    set(CMAKE_PREFIX_PATH "$ENV{CMAKE_PREFIX_PATH}")
+endif()
 
 find_package(Torch REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
-set(CMAKE_BUILD_TYPE "DEBUG")
+set(CMAKE_BUILD_TYPE "RELEASE")
 
 
 add_executable(Parallel-Dynamic-Sparse-Training mult/main.cpp)

@@ -28,7 +28,7 @@ class ZetaPrunerGrower:
         values.data = values[msk]
         indices_a.data = indices_a.to(dtype=torch.int32)[msk].to(dtype=torch.uint16).data
         indices_b.data = indices_b.to(dtype=torch.int32)[msk].to(dtype=torch.uint16).data
-        # todo implement this in cuda instead
+        # Note: This operation could be optimized with CUDA implementation for better performance
 
     def regrow(self, init: typing.Type[SparseInitializer] = None, device="cpu"):
         indices_a = self.layer.indices_a

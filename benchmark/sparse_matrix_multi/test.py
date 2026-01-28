@@ -1,6 +1,6 @@
 from sparse.mult.tensor import SparseTensor, create_random_sparse_matrix
 import torch
-
+import math
 
 def tst1():
 
@@ -12,7 +12,7 @@ def tst1():
 
         return torch.sparse_coo_tensor(indices, sp.values, sp.matrix_shape, device="cuda")
 
-    sp = create_random_sparse_matrix(5000, 5000, 0)
+    sp = create_random_sparse_matrix(5000, 5000, 50)
 
     sp = sp.cuda()
 
@@ -70,5 +70,22 @@ def tst3():
     print((r1 - r2).abs().max())
 
 
+def tst4():
+    sp = create_random_sparse_matrix(1000, 1000, 0).cuda()
+    activations = torch.rand((1, 1000)).cuda().to(torch.float32) * math.sqrt(2)
+    sp.values = sp.values.to(torch.float32) * math.sqrt(2)
+    d1 = sp.dense().to(torch.float32)
+    d2 = sp.dense().to(torch.float64)
+    
+    
+
+    r1 =  activations @ d1
+    r2 = activations.to(torch.float64) @ d2 .to(torch.float64)
+    r3 = sp @ activations
+    
+    print("Dense float vs dense double", (r1 - r2).abs().max())
+    print("Dense float vs sparse", (r1 - r3).abs().max())
+    print("Dense double vs sparse", (r2 - r3).abs().max())
+
 if __name__ == "__main__":
-    tst3()
+    tst4()
