@@ -108,3 +108,8 @@ python setup.py install
 # Set PyTorch library path (Linux)
 # Modify the path according to your Python installation
 export LD_LIBRARY_PATH=$(python -c "import torch; import os; print(os.path.join(os.path.dirname(torch.__file__), 'lib'))"):$LD_LIBRARY_PATH
+
+if you have the dataset on a remote server you can connect from it using the following command
+
+```shell
+ssh -L 8888:localhost:8888 -p 2222 username@LINK
