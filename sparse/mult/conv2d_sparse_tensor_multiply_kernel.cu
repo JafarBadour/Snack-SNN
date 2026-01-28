@@ -32,7 +32,7 @@ __global__ void conv2d_sparse_tensor_multiply_kernel(
     // kw = indices_kw[indices_f + i]
     // kh = indices_kh[indices_f + i]
 
-    int* sparse_filters_matrix_indices_r, // maybe all of these should be ints? #TODO
+    int* sparse_filters_matrix_indices_r,
 
     int* sparse_filters_matrix_indices_kw,
 
@@ -83,7 +83,7 @@ __global__ void conv2d_sparse_tensor_multiply_kernel(
         // Compute input position with stride and padding (using pre-computed values)
         int input_h = pixel_h_stride_minus_padding + kh;
         int input_w = pixel_w_stride_minus_padding + kw;
-        
+        // out_pixel_value += sparse_filters_matrix_values[i] * input_feature_map[input_idx];
         // Bounds check for padding
         if (input_h >= 0 && input_h < H_in && input_w >= 0 && input_w < W_in) {
             int input_idx = batch_input_offset + r * H_in_W_in + input_h * W_in + input_w;
@@ -123,7 +123,7 @@ torch::Tensor conv2d_sparse_tensor_multiply_cuda(
     // Launch kernel
     // Simple 1D grid: each thread computes one output element
     int total_outputs = N * Cout * H_out * W_out;
-    const int threads = 256;  // Use 256 threads per block for better occupancy
+    const int threads = 1024;  // Use 256 threads per block for better occupancy
     int num_blocks = (total_outputs + threads - 1) / threads;
     
     conv2d_sparse_tensor_multiply_kernel<<<num_blocks, threads>>>(

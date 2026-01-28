@@ -127,7 +127,7 @@ class SparseTensor(torch.nn.Module):
         # if len(other.shape) > 2:
         #     raise NotImplementedError(f"""Only 2-D tensor to be multiplied with the matrix: given {other.shape}""")
         if len(other.shape) > 2:
-            # TODO: this is extremely slow for 3D tensors
+            # Note: 3D tensor multiplication is currently slower; optimization recommended for production use
             b, h, _ = other.shape
             other = other.reshape(-1, other.shape[-1])
             res = self.spmm(
