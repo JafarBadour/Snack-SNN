@@ -3,6 +3,34 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 
+# Default colors for paper-style legends (extended with tab20 for unknown types).
+_PAPER_TYPE_ORDER = [
+    "Dense",
+    "Snack",
+    "JaxSparse",
+    "SparseTorch",
+    "SparseUT",
+    "Dense (Only)",
+    "CuPy Sparse CSR",
+    "Sputnik",
+]
+
+
+def _type_color_map(types_present):
+    """Stable colors for known backends; assign distinct tab20 colors for any other Type."""
+    tab20 = plt.cm.tab20.colors
+    color_map = {}
+    used = 0
+    for name in _PAPER_TYPE_ORDER:
+        if name in types_present:
+            color_map[name] = tab20[used % len(tab20)]
+            used += 1
+    for t in sorted(types_present):
+        if t not in color_map:
+            color_map[t] = tab20[used % len(tab20)]
+            used += 1
+    return color_map
+
 
 def plt_them(
     df_dlvl,
@@ -23,18 +51,14 @@ def plt_them(
     max_avg_ct_ = 0
     min_avg_ct_ = np.inf
     unique_keys = df_dlvl["Type"].unique().tolist()
-    colors = plt.cm.tab10.colors  # Assign colors per Type
     if len(categories) == 0:
-        color_map = {
-            category: colors[i] for i, category in enumerate(["Dense", "Snack", "JaxSparse", "SparseTorch", "SparseUT", "Dense (Only)"])
-        }
-        idx_map = {category: i for i, category in enumerate(["Dense", "Snack", "JaxSparse", "SparseTorch", "SparseUT", "Dense (Only)"])}
-        color_map["Dense+Mask"] = color_map["Dense"]
-        idx_map["Dense+Mask"] = idx_map["Dense"]
+        color_map = _type_color_map(set(unique_keys))
+        idx_map = {category: i for i, category in enumerate(sorted(color_map.keys()))}
+        color_map["Dense+Mask"] = color_map.get("Dense+Mask", color_map.get("Dense", plt.cm.tab20.colors[0]))
+        idx_map["Dense+Mask"] = idx_map.get("Dense+Mask", idx_map.get("Dense", 0))
     else:
-        color_map = {
-            category: colors[i] for i, category in enumerate(categories)
-        }
+        colors = plt.cm.tab20.colors
+        color_map = {category: colors[i % len(colors)] for i, category in enumerate(categories)}
         idx_map = {category: i for i, category in enumerate(categories)}
 
         df_dlvl = df_dlvl[df_dlvl.Type.isin(categories)]
@@ -65,16 +89,16 @@ def plt_them(
                 color=color_map[is_sparse],
             )
 
-            # Annotate batch size on the middle of the line
-            mid_idx = len(sparsity_level) // 2
-            if batch_needed and idx_map[is_sparse] == 0 and 128 >= batch_size >= 2:
+            # Annotate batch size on the middle of the sparsity sweep
+            mid_idx = min(len(sparsity_level) // 2, len(sparsity_level) - 1)
+            if batch_needed and idx_map.get(is_sparse, 0) == 0 and 128 >= batch_size >= 2:
                 continue
 
             ax.annotate(
                 f"bz={batch_size}" if batch_needed else "",
                 (
-                    sparsity_level.iloc[idx_map[is_sparse]],
-                    avg_per_sparsity.iloc[idx_map[is_sparse]],
+                    sparsity_level.iloc[mid_idx],
+                    avg_per_sparsity.iloc[mid_idx],
                 ),
                 textcoords="offset points",
                 xytext=(0, 5),
@@ -176,4 +200,72 @@ def create_single_plot_for_batches(
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
 
+    return fig
+
+
+def dense_level_area(dense_level: str) -> int:
+    a, b = dense_level.split("x")
+    return int(a) * int(b)
+
+
+def plot_matrix_size_sweep(
+    df,
+    col,
+    sparsity_level,
+    BATCHES,
+    figsize=(7, 5),
+    ax=None,
+    log=False,
+    title="",
+    y_label="",
+    categories=None,
+):
+    """
+    Fixed sparsity: x = matrix area (layer_a * layer_b), y = timing.
+    Use when CSVs only contain one sparsity level (line vs sparsity degenerates).
+    """
+    if ax is None:
+        fig, ax = plt.subplots(1, figsize=figsize)
+    else:
+        fig = ax.figure
+
+    d = df[(df.sparsity_level == sparsity_level) & (df.batch_size.isin(BATCHES))].copy()
+    if categories:
+        d = d[d.Type.isin(categories)]
+    d["_area"] = d["dense_level"].astype(str).map(dense_level_area)
+    types_present = d["Type"].unique().tolist()
+    color_map = _type_color_map(set(types_present))
+
+    max_y, min_y = 0, np.inf
+    for typ, g in d.groupby("Type"):
+        curve = g.groupby("_area")[col].mean().sort_index()
+        err = g.groupby("_area")[col].std().fillna(0) / np.sqrt(
+            g.groupby("_area")[col].count().clip(lower=1)
+        )
+        max_y = max(max_y, curve.max())
+        min_y = min(min_y, curve.min())
+        ax.plot(
+            curve.index,
+            curve.values,
+            linestyle="-",
+            marker="o",
+            color=color_map[typ],
+            label=typ,
+            alpha=0.9,
+        )
+        ax.fill_between(
+            curve.index,
+            curve.values - err,
+            curve.values + err,
+            alpha=0.12,
+            color=color_map[typ],
+        )
+
+    ax.set_xlabel(r"Matrix size ($n \times m$ area)")
+    ax.set_ylabel(y_label or col)
+    ax.set_title(title)
+    ax.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.7)
+    if log:
+        ax.set_yscale("log")
+    ax.legend(title="Backend", loc="best", fontsize=9)
     return fig

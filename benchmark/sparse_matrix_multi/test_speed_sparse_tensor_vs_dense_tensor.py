@@ -15,16 +15,16 @@ from benchmark.sparse_matrix_multi.__test_methods import (
     test_jax_bsr,
     test_jax_csr,
     test_sparse_cupy_csr,
-    test_sparse_torch_csr
+    test_sparse_torch_csr,
+    test_sputnik,
 )
 
 TESTING_DEVICE = "cuda"  # "cuda"
 sparsity_levels = (
-    # list(range(0, 50, 24)) +
-    # list(range(50, 80, 10))+
-    #  list(range(80, 96, 5))
-    # + [96, 97, 98, 99, 99.5, 99.9]
-    [95]
+    list(range(0, 50, 24))
+    + list(range(50, 80, 10))
+    + list(range(80, 96, 5))
+    + [96, 97, 98, 99, 99.5, 99.9]
 )
 
 # dense level is layer A with layer B that are after one another in the model architecture
@@ -32,14 +32,14 @@ dense_levels = {
     "500x500": {"Reps": 2},
      "1000x1000": {"Reps": 2},
     "5000x5000": {"Reps": 2},
-    # "7500x7500": {"Reps": 2},
-    # "8500x8500": {"Reps": 2},
+    "7500x7500": {"Reps": 2},
+    "8500x8500": {"Reps": 2},
     "10000x10000" : {'Reps' : 2},
     # "15000x15000" : {'Reps' : 2},
 }
 
 csv_name = "aug-1-log_mult_incl_cupy"
-batches_cnt = [1]
+batches_cnt = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
 
 import warnings
 
@@ -57,7 +57,8 @@ method_dict = dict(
     test_jax_bsr=test_jax_bsr,
     # test_jax_csr=test_jax_csr, # not implemented error
     test_sparse_cupy_csr=test_sparse_cupy_csr,
-    test_sparse_torch_csr=test_sparse_torch_csr
+    test_sparse_torch_csr=test_sparse_torch_csr,
+    test_sputnik=test_sputnik,
 )
 def benchmark(method_name : str):
     log = []

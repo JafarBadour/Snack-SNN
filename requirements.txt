@@ -1,5 +1,41 @@
-tqdm==4.66.5
-nvidia-ml-py3==7.352.0
+# Core dependencies
+# Install these first. The CUDA extension in sparse/mult/ is built with
+#   pip install -e sparse/mult --no-build-isolation
+# (or: bash sparse/mult/install_cuda124.sh) so setup.py can import torch.
+# On a GPU-less login node, set TORCH_CUDA_ARCH_LIST (e.g. 8.9 for L40) or
+# rely on setup.py defaulting to 8.9 when no CUDA device is visible.
 torch==2.5.1
-torchaudio==2.5.1
 torchvision==0.20.1
+torchaudio==2.5.1
+numpy>=1.24.0
+pandas>=2.0.0
+tqdm==4.66.5
+
+# GPU profiling and monitoring
+nvidia-ml-py3==7.352.0
+pynvml>=11.0.0
+psutil>=5.9.0
+
+# Scientific computing and sparse operations
+scipy>=1.10.0
+
+# Plotting
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Optional: For benchmark comparisons (install separately if needed)
+# jax>=0.4.0
+# jaxlib>=0.4.0
+# cupy-cuda12x>=13.0.0  # Requires CUDA 12.x
+# spconv>=2.3.0  # Requires CUDA and specific setup
+# JAX for sparse matrix benchmark comparisons
+jax>=0.4.0
+jaxlib>=0.4.0
+
+# CuPy for GPU sparse operations (requires CUDA 12.x)
+cupy-cuda12x>=13.3.0
+
+# spconv for sparse convolution comparisons (optional, complex installation)
+# Note: spconv installation requires specific CUDA setup
+# See: https://github.com/traveller59/spconv
+# spconv>=2.3.0
