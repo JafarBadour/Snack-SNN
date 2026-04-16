@@ -1,4 +1,9 @@
 # Core dependencies
+# Install these first. The CUDA extension in sparse/mult/ is built with
+#   pip install -e sparse/mult --no-build-isolation
+# (or: bash sparse/mult/install_cuda124.sh) so setup.py can import torch.
+# On a GPU-less login node, set TORCH_CUDA_ARCH_LIST (e.g. 8.9 for L40) or
+# rely on setup.py defaulting to 8.9 when no CUDA device is visible.
 torch==2.5.1
 torchvision==0.20.1
 torchaudio==2.5.1

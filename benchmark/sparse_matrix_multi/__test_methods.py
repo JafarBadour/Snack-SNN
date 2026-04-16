@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ctypes
 import os
 import sys
 from pathlib import Path
@@ -7,6 +8,7 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 import jax.experimental.sparse as jsparse
+import numpy as np
 import time
 from tqdm import tqdm
 from sparse.mult.tensor import SparseTensor
@@ -15,6 +17,7 @@ import scipy.sparse as sp
 
 _flashsparse_modules = None
 _sputnik_module = None
+_SPUTNIK_LIB = None
 
 
 def _prepend_sys_path(p: str) -> None:
@@ -101,6 +104,115 @@ def _get_sputnik_torch_ext():
 
     _sputnik_module = sputnik_torch_ext
     return _sputnik_module
+
+
+def _load_sputnik_python_lib():
+    """Load libsputnik_python.so (build via sputnik_ext/build_binding.sh)."""
+    global _SPUTNIK_LIB
+    if _SPUTNIK_LIB is not None:
+        return _SPUTNIK_LIB
+    base = Path(__file__).resolve().parent / "sputnik_ext" / "libsputnik_python.so"
+    path = os.environ.get("SPUTNIK_PYTHON_SO", str(base))
+    if not os.path.isfile(path):
+        raise FileNotFoundError(
+            f"Sputnik Python binding not found at {path}. Build with:\n"
+            f"  bash {base.parent / 'build_binding.sh'}"
+        )
+    lib = ctypes.CDLL(path, mode=ctypes.RTLD_GLOBAL)
+    lib.sputnik_spmm_float.argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+    ]
+    lib.sputnik_spmm_float.restype = ctypes.c_int
+    _SPUTNIK_LIB = lib
+    return lib
+
+
+def spmm_dense_reference(sparse_matrix: SparseTensor, ones: torch.Tensor) -> torch.Tensor:
+    """Dense reference for benchmark SpMM: (B, la) @ (la, lb)."""
+    return ones @ sparse_matrix.dense()
+
+
+def sputnik_spmm_result(
+    sparse_matrix: SparseTensor,
+    ones: torch.Tensor,
+    layera: int,
+    layerb: int,
+) -> torch.Tensor:
+    """
+    One Sputnik SpMM matching the benchmark: returns (B, lb) float32 on ``ones.device``.
+    Does not consume ``sparse_matrix`` (benchmark path may ``del`` it for memory).
+    """
+    import cupy as cp
+    import cupyx.scipy.sparse as cpsparse
+
+    lib = _load_sputnik_python_lib()
+
+    indices = torch.concat(
+        (
+            sparse_matrix.indices_a.reshape(1, -1),
+            sparse_matrix.indices_b.reshape(1, -1),
+        ),
+        axis=0,
+    )
+    coo = cpsparse.coo_matrix(
+        (
+            cp.asarray(sparse_matrix.values.detach().cpu().numpy()),
+            cp.asarray(indices.to(dtype=torch.int32).cpu().numpy()),
+        ),
+        shape=sparse_matrix.matrix_shape,
+    )
+    csr = coo.tocsr()
+    csr_t = csr.transpose().tocsr()
+
+    m = layerb
+    k = layera
+    batch = int(ones.shape[0])
+    n = batch
+    nnz = int(csr_t.nnz)
+
+    indptr = cp.asnumpy(csr_t.indptr)
+    lengths = np.diff(indptr.astype(np.int64))
+    order = np.argsort(-lengths).astype(np.int32)
+    row_indices = cp.asarray(order)
+
+    row_offsets = csr_t.indptr.astype(cp.int32)
+    column_indices = csr_t.indices.astype(cp.int32)
+    values = csr_t.data.astype(cp.float32)
+
+    dense_b = cp.asarray(ones.detach().cpu().numpy(), dtype=cp.float32).T.copy(order="C")
+    out = cp.zeros((m, n), dtype=cp.float32)
+
+    stream = torch.cuda.current_stream().cuda_stream
+    stream_p = ctypes.c_void_p(stream)
+
+    err = lib.sputnik_spmm_float(
+        m,
+        k,
+        n,
+        nnz,
+        row_indices.data.ptr,
+        values.data.ptr,
+        row_offsets.data.ptr,
+        column_indices.data.ptr,
+        dense_b.data.ptr,
+        out.data.ptr,
+        stream_p,
+    )
+    if err != 0:
+        raise RuntimeError(f"sputnik::CudaSpmm returned cudaError_t {err}")
+    torch.cuda.synchronize()
+    # Kernel layout (lb, batch); reference is (batch, lb)
+    return torch.from_numpy(cp.asnumpy(out).T.copy()).to(device=ones.device, dtype=torch.float32)
 
 
 def test_jax(
@@ -336,8 +448,8 @@ def test_sparse_cupy(
     csr=False,
 ):
 
+    import cupyx.scipy.sparse as cpsparse
     import cupy as cp
-    import cupyx.scipy.sparse as sparse
     indices = torch.concat(
         (
             sparse_matrix.indices_a.reshape(1, -1),
@@ -346,7 +458,7 @@ def test_sparse_cupy(
         axis=0,
     )
 
-    sparse_tensor = sparse.coo_matrix((
+    sparse_tensor = cpsparse.coo_matrix((
         cp.asarray(sparse_matrix.values.cpu().numpy()),
         cp.asarray(indices.to(dtype=torch.int32).cpu().numpy())),
         shape=sparse_matrix.matrix_shape
@@ -405,8 +517,8 @@ def test_sparse_cupy_bsr(
     batsh_sz,
 ):
 
+    import cupyx.scipy.sparse as cpsparse
     import cupy as cp
-    import cupyx.scipy.sparse as sparse
     indices = torch.concat(
         (
             sparse_matrix.indices_a.reshape(1, -1),
@@ -415,7 +527,7 @@ def test_sparse_cupy_bsr(
         axis=0,
     )
 
-    sparse_tensor = sparse.coo_matrix((
+    sparse_tensor = cpsparse.coo_matrix((
         cp.asarray(sparse_matrix.values.cpu().numpy()),
         cp.asarray(indices.to(dtype=torch.int32).cpu().numpy())),
         shape=sparse_matrix.matrix_shape

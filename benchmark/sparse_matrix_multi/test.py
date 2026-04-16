@@ -1,8 +1,24 @@
-from sparse.mult.tensor import SparseTensor, create_random_sparse_matrix
-import torch
+"""
+Ad-hoc SpMM checks (max abs diff). Same style for every ``tst*``:
+print tensors or a single max-abs line vs dense ``ones @ W``.
+
+Structured unittest (same math): ``test_spmm_correctness.py``.
+"""
 import math
-from pathlib import Path
+import os
 import sys
+from pathlib import Path
+
+import torch
+
+from sparse.mult.tensor import SparseTensor, create_random_sparse_matrix
+
+
+def _ensure_repo_root_on_path() -> None:
+    """So ``python benchmark/sparse_matrix_multi/test.py`` can import ``benchmark.*``."""
+    root = Path(__file__).resolve().parents[2]
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
 
 
 def _try_get_sputnik_module():
@@ -167,6 +183,67 @@ def tst5_sputnik_correctness():
         "allclose(Dense, Sputnik):",
         torch.allclose(dense_ref, sputnik_out, rtol=1e-4, atol=1e-4),
     )
+
+def tst5():
+    """
+    Benchmark backends vs dense reference ``ones @ sp.dense()`` (max abs diff), like tst1/tst3.
+    Torch + CuPy + optional Sputnik (needs built ``sputnik_ext/libsputnik_python.so``).
+    """
+    torch.manual_seed(0)
+    layera, layerb = 256, 128
+    batch = 8
+    sp = create_random_sparse_matrix(layera, layerb, 90.0).cuda()
+    sp.values = sp.values.float()
+    ones = torch.randn(batch, layera, device="cuda", dtype=torch.float32)
+    ref = ones @ sp.dense()
+
+    print("SparseUT vs dense", (sp @ ones - ref).abs().max().item())
+
+    indices = torch.concat(
+        (sp.indices_a.reshape(1, -1), sp.indices_b.reshape(1, -1)),
+        axis=0,
+    )
+    for label, use_csr in [("Torch sparse COO", False), ("Torch sparse CSR", True)]:
+        st = torch.sparse_coo_tensor(
+            indices, sp.values, sp.matrix_shape, device="cuda", dtype=sp.values.dtype
+        )
+        if use_csr:
+            st = st.to_sparse_csr()
+        print(f"{label} vs dense", (ones @ st - ref).abs().max().item())
+
+    try:
+        import cupy as cp
+        import cupyx.scipy.sparse as cpsparse
+    except ImportError as e:
+        print("CuPy (skip)", e)
+    else:
+        for label, use_csr in [("CuPy COO", False), ("CuPy CSR", True)]:
+            coo = cpsparse.coo_matrix(
+                (
+                    cp.asarray(sp.values.cpu().numpy()),
+                    cp.asarray(indices.to(dtype=torch.int32).cpu().numpy()),
+                ),
+                shape=sp.matrix_shape,
+            )
+            mat = coo.tocsr() if use_csr else coo
+            y = cp.asarray(ones.cpu().numpy()) @ mat
+            got = torch.from_numpy(cp.asnumpy(y)).to(device=ones.device, dtype=ones.dtype)
+            print(f"{label} vs dense", (got - ref).abs().max().item())
+
+    so = os.environ.get(
+        "SPUTNIK_PYTHON_SO",
+        str(Path(__file__).resolve().parent / "sputnik_ext" / "libsputnik_python.so"),
+    )
+    if not os.path.isfile(so):
+        print("Sputnik (skip): no", so)
+        return
+
+    _ensure_repo_root_on_path()
+    from benchmark.sparse_matrix_multi.__test_methods import sputnik_spmm_result
+
+    got = sputnik_spmm_result(sp, ones, layera, layerb)
+    print("Sputnik vs dense", (got - ref).abs().max().item())
+
 
 if __name__ == "__main__":
     tst4()
