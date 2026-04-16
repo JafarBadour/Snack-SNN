@@ -14,6 +14,7 @@ import torch
 import scipy.sparse as sp
 
 _flashsparse_modules = None
+_sputnik_module = None
 
 
 def _prepend_sys_path(p: str) -> None:
@@ -86,6 +87,20 @@ def _get_flashsparse():
 
     _flashsparse_modules = (FS_SpMM, FS_Block_gpu)
     return _flashsparse_modules
+
+
+def _get_sputnik_torch_ext():
+    """Lazy import for the local PyTorch wrapper around upstream Sputnik."""
+    global _sputnik_module
+    if _sputnik_module is not None:
+        return _sputnik_module
+    repo_root = Path(__file__).resolve().parents[2]
+    ext_dir = repo_root / "benchmark" / "sparse_matrix_multi" / "sputnik_torch_ext"
+    _prepend_sys_path(str(ext_dir))
+    import sputnik_torch_ext  # type: ignore  # noqa: PLC0415
+
+    _sputnik_module = sputnik_torch_ext
+    return _sputnik_module
 
 
 def test_jax(
@@ -322,7 +337,7 @@ def test_sparse_cupy(
 ):
 
     import cupy as cp
-    from cupy import sparse
+    import cupyx.scipy.sparse as sparse
     indices = torch.concat(
         (
             sparse_matrix.indices_a.reshape(1, -1),
@@ -391,7 +406,7 @@ def test_sparse_cupy_bsr(
 ):
 
     import cupy as cp
-    from cupy import sparse
+    import cupyx.scipy.sparse as sparse
     indices = torch.concat(
         (
             sparse_matrix.indices_a.reshape(1, -1),
@@ -593,4 +608,75 @@ def test_flashsparse(
             }
         )
 
+
+def test_sputnik(
+    log: list,
+    sparse_matrix: SparseTensor,
+    layera: int,
+    layerb: int,
+    ones: torch.Tensor,
+    sparsity_level,
+    dense_level,
+    reps,
+    batsh_sz,
+):
+    """
+    Sputnik SpMM via local torch extension.
+    We benchmark the same numeric task as others: ones @ S.
+    Sputnik computes A @ B with CSR(A), so we execute S.T @ ones.T and transpose.
+    """
+    try:
+        sputnik_torch_ext = _get_sputnik_torch_ext()
+    except ImportError as e:
+        raise ImportError(
+            "sputnik_torch_ext is not importable.\n"
+            "  Build Sputnik + wrapper: bash benchmark/sparse_matrix_multi/install_sputnik_torch.sh\n"
+            "  Then export PYTHONPATH to include benchmark/sparse_matrix_multi/sputnik_torch_ext."
+        ) from e
+
+    import numpy as np
+    from scipy.sparse import csr_matrix
+
+    row = sparse_matrix.indices_b.int().cpu().numpy()
+    col = sparse_matrix.indices_a.int().cpu().numpy()
+    data = sparse_matrix.values.float().cpu().numpy()
+    m, k = layerb, layera
+    csr = csr_matrix((data, (row, col)), shape=(m, k))
+
+    row_offsets = torch.from_numpy(np.ascontiguousarray(csr.indptr.astype(np.int32))).cuda()
+    column_indices = torch.from_numpy(np.ascontiguousarray(csr.indices.astype(np.int32))).cuda()
+    values = torch.from_numpy(np.ascontiguousarray(csr.data.astype(np.float32))).cuda()
+    row_indices = torch.arange(m, dtype=torch.int32, device="cuda")
+
+    rhs = ones.detach().float().transpose(0, 1).contiguous()
+    assert rhs.shape == (layera, batsh_sz), (rhs.shape, (layera, batsh_sz))
+
+    _ = sputnik_torch_ext.spmm(row_indices, values, row_offsets, column_indices, rhs)
+
+    for rep in tqdm(list(range(reps)), desc="Reps Sputnik", leave=False):
+        start_event = torch.cuda.Event(enable_timing=True)
+        end_event = torch.cuda.Event(enable_timing=True)
+        torch.cuda.synchronize()
+        start_event.record()
+        t1 = time.time()
+        for _ in range(100):
+            out = sputnik_torch_ext.spmm(
+                row_indices, values, row_offsets, column_indices, rhs
+            )
+            _ = out / (out.abs().max().clamp(min=1e-8))
+        t2 = time.time()
+        end_event.record()
+        torch.cuda.synchronize()
+        elapsed_time_ms = start_event.elapsed_time(end_event)
+        log.append(
+            {
+                "isSparse": "Sputnik",
+                "dense_level": dense_level,
+                "sparsity_level": sparsity_level,
+                "time": t2 - t1,
+                "cuda_elapsed_time": elapsed_time_ms,
+                "rep": rep,
+                "batch_size": batsh_sz,
+            }
+        )
 

@@ -17,6 +17,7 @@ from benchmark.sparse_matrix_multi.__test_methods import (
     test_sparse_cupy_csr,
     test_sparse_torch_csr,
     test_flashsparse,
+    test_sputnik,
 )
 
 TESTING_DEVICE = "cuda"  # "cuda"
@@ -64,6 +65,7 @@ method_dict = dict(
     test_sparse_cupy_csr=test_sparse_cupy_csr,
     test_sparse_torch_csr=test_sparse_torch_csr,
     test_flashsparse=test_flashsparse,
+    test_sputnik=test_sputnik,
 )
 def benchmark(method_name : str):
     log = []
