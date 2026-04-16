@@ -67,29 +67,44 @@ to plot the results please find the necessary notebooks at
     └── DST
         └── minst.ipynb # not reported in paper
 ```
-# installing 
+# Installation
 
-after installing nvcc and cuda 12.6 or 12.1
+## Prerequisites
 
+- CUDA 12.1 or 12.6
+- Python 3.12+
+- nvcc compiler
+
+## Setup
+
+1. Create a conda environment:
+```bash
+conda create -p ./venv python=3.12.7
+conda activate ./venv
 ```
-conda create -p ./venv2 python=3.12.7
-```
 
-run this 
+2. Install CUDA toolkit (if not already installed):
 ```bash
 sudo apt install nvidia-cuda-toolkit
-
-
+# Or download from: https://developer.nvidia.com/cuda-downloads
 ```
 
-check this link to install cuda 12.6
-
+3. Install PyTorch with CUDA support:
 ```bash
-https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=22.04&target_type=deb_local```
-```
-```
 pip install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 ```
+
+4. Install core dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+5. (Optional) Install benchmark dependencies for comparison tests:
+```bash
+pip install -r requirements-benchmark.txt
+```
+
+Note: Some benchmark dependencies (jax, cupy, spconv) may require additional setup. See `requirements-benchmark.txt` for details.
 
 
 ```

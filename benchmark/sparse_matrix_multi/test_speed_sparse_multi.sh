@@ -7,6 +7,7 @@ for idx in test_sparse_cupy_csr \
            test_sparse_ut \
            test_sparse_torch \
            test_dense
+           # test_flashsparse  # optional: build https://github.com/ParCIS/FlashSparse then run: python ... test_flashsparse
 
 
 # for idx in test_sparse_ut \
