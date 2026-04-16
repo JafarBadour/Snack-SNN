@@ -16,6 +16,7 @@ from benchmark.sparse_matrix_multi.__test_methods import (
     test_jax_csr,
     test_sparse_cupy_csr,
     test_sparse_torch_csr,
+    test_flashsparse,
     test_sputnik,
 )
 
@@ -30,6 +31,10 @@ sparsity_levels = (
 # dense level is layer A with layer B that are after one another in the model architecture
 dense_levels = {
     "500x500": {"Reps": 2},
+    "100x100": {"Reps": 2},
+    "250x100000": {"Reps": 2},
+    "500x500": {"Reps": 2},
+    "500x500": {"Reps": 2},
      "1000x1000": {"Reps": 2},
     "5000x5000": {"Reps": 2},
     "7500x7500": {"Reps": 2},
@@ -38,8 +43,8 @@ dense_levels = {
     # "15000x15000" : {'Reps' : 2},
 }
 
-csv_name = "aug-1-log_mult_incl_cupy"
-batches_cnt = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]
+csv_name = "apr-13-log_mult_incl_cupy"
+batches_cnt = [1, 2, 4, 8, 16]
 
 import warnings
 
@@ -58,6 +63,7 @@ method_dict = dict(
     # test_jax_csr=test_jax_csr, # not implemented error
     test_sparse_cupy_csr=test_sparse_cupy_csr,
     test_sparse_torch_csr=test_sparse_torch_csr,
+    test_flashsparse=test_flashsparse,
     test_sputnik=test_sputnik,
 )
 def benchmark(method_name : str):
