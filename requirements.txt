@@ -23,6 +23,10 @@ scipy>=1.10.0
 matplotlib>=3.7.0
 seaborn>=0.12.0
 
+# NLP experiment dependencies (SST-2 + BERT embeddings)
+transformers>=4.40.0
+datasets>=2.18.0
+
 # Optional: For benchmark comparisons (install separately if needed)
 # jax>=0.4.0
 # jaxlib>=0.4.0

@@ -6,16 +6,18 @@ set -euo pipefail
 # - test_flashsparse: requires `bash benchmark/sparse_matrix_multi/install_flashsparse.sh`
 # - test_sputnik:     requires `bash benchmark/sparse_matrix_multi/install_sputnik_torch.sh`
 METHODS=(
-  test_sparse_cupy_csr
-  test_sparse_cupy
-  test_sparse_torch_csr
+#   test_sparse_cupy_csr
+#   test_sparse_cupy
+#   test_sparse_torch_csr
+#   test_flashsparse
+  test_sputnik
+  test_sparse_ut
+  test_dense
   test_jax_bsr
   test_jax
-  test_sparse_ut
   test_sparse_torch
-  test_dense
-  test_flashsparse
-  test_sputnik
+  
+
 )
 
 for idx in "${METHODS[@]}"; do

@@ -21,7 +21,8 @@ class ZetaPrunerGrower:
 
         # we decrease indices by zeta and then regrow by zeta
 
-        _, idxs = torch.topk(values, self.nz, largest=False)
+        # Magnitude pruning: remove smallest-|w| entries, not most-negative entries.
+        _, idxs = torch.topk(values.abs(), self.nz, largest=False)
         msk = torch.ones_like(indices_a, dtype=torch.bool)
 
         msk[idxs] = False
