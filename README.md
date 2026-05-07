@@ -47,7 +47,7 @@
 ```
 
 
-There are mainly three experiemnt tracks in the repository
+There are mainly three experiment tracks in the repository
 ```
 train/DST/train.py # results explained in figure 4 
 train/DST/mnist.py # results not reported in the paper but it basically shows how to use SNACK in a real world training problem
@@ -67,6 +67,233 @@ to plot the results please find the necessary notebooks at
     └── DST
         └── minst.ipynb # not reported in paper
 ```
+
+# Reproducing the benchmarks
+
+All benchmarks expect the repo root to be on `PYTHONPATH` and the `sparse/mult`
+CUDA extension to be installed (see [Installation](#installation)). After
+activating your environment from the repo root:
+
+```bash
+export PYTHONPATH="$PWD:$PYTHONPATH"
+export LD_LIBRARY_PATH="$(python -c "import torch, os; print(os.path.join(os.path.dirname(torch.__file__), 'lib'))"):$LD_LIBRARY_PATH"
+```
+
+## 1) End-to-end SpMM + MLP sweep (Figure 3, Table `tab:sparse_performance`, `tab:performance_comparison_snack`)
+
+The SpMM benchmark sweeps every backend (Sputnik, FlashSparse, cuSPARSE
+COO/CSR, SparseTorch, SparseCuPy, JAX-BSR, ge-spmm/dgsparse, Sputnik-CSR-DL,
+and our SNACK / SparseUT kernel) over a grid of `(batch_size, dense_level,
+sparsity_level)`. The single-shot driver below activates the venv, installs
+the runtime/benchmark requirements, builds `sparse/mult`, builds
+`sputnik_torch_ext`, builds FlashSparse, and then launches every method,
+continuing past method-level failures:
+
+```bash
+bash benchmark/sparse_matrix_multi/run_everything_spmm_mlp.sh
+```
+
+Useful overrides:
+
+```bash
+# Pick a subset of methods (any value from method_dict in
+# test_speed_sparse_tensor_vs_dense_tensor.py):
+METHODS="test_sputnik test_dense test_sparse_ut" \
+  bash benchmark/sparse_matrix_multi/run_everything_spmm_mlp.sh
+
+# Tune the MLP backend sweep (check_snack_backends.py):
+SPARSITY=0.95 WARMUP=10 ITERS=30 \
+  bash benchmark/sparse_matrix_multi/run_everything_spmm_mlp.sh
+```
+
+To run a single SpMM backend by hand (skipping the dependency / build steps
+above), use the underlying entry point directly:
+
+```bash
+python -m benchmark.sparse_matrix_multi.test_speed_sparse_tensor_vs_dense_tensor test_sputnik
+```
+
+Each backend writes a CSV to
+`benchmark/apr-13-log_mult_incl_cupy-<method>.csv`. The notebook
+`notebooks/stats.ipynb` consumes those CSVs and produces Figure 3
+(`SpMM vs DenseMM-3panel-b1-b2-b4.pdf`) plus the appendix variants. The MLP
+backend correctness/speed sweep (`check_snack_backends.py`) writes its
+own CSVs/JSON next to itself and feeds the SNACK-vs-Dense+Mask tables.
+
+### Slurm submission
+
+```bash
+# Defaults: 1× Lovelace GPU, 16 CPUs, 6 GB RAM, 2 h walltime.
+sbatch benchmark/sparse_matrix_multi/sbatch_gpu_benchmarks.sh
+
+# Or just the tst5 SpMM correctness check:
+sbatch benchmark/sparse_matrix_multi/sbatch_tst5_spmm.sh
+```
+
+## 2) External SpMM baselines (Sputnik / FlashSparse / Flash-LLM / SpInfer / SMaT / VENOM / SparTA / Wanda / SparseGPT / RigL)
+
+These baselines live under `experiments/spmm_exps/` and are orchestrated by a
+generic runner with a uniform `--phase setup | bench` interface:
+
+```bash
+# 1) Build everything (clones into experiments/spmm_exps/<baseline>/third_party
+#    and runs the per-baseline build script):
+python experiments/spmm_exps/run_suite.py --phase setup --keep-going
+
+# 2) Run all baselines in priority order:
+python experiments/spmm_exps/run_suite.py --phase bench --keep-going
+
+# Single baseline (use --dry-run first to inspect the commands):
+python experiments/spmm_exps/run_baseline.py --baseline sputnik --phase setup
+python experiments/spmm_exps/run_baseline.py --baseline sputnik --phase bench
+```
+
+Mask-generator baselines need a model checkpoint:
+
+```bash
+WANDA_MODEL=meta-llama/Llama-2-7b-hf \
+  python experiments/spmm_exps/run_baseline.py --baseline wanda --phase bench
+
+SPARSEGPT_MODEL=facebook/opt-125m \
+  python experiments/spmm_exps/run_baseline.py --baseline sparsegpt --phase bench
+```
+
+Sputnik and FlashSparse are wired directly into the in-tree harness above;
+the rest go through `benchmark/sparse_matrix_multi/run_external_baseline.py`.
+See `experiments/spmm_exps/README.md` for the full table.
+
+## 3) GPT-2 + DST + SNACK (Tables `tab:gpt2_training_compact`, `tab:gpt2_inference_compact`)
+
+Benchmarks GPT-2 MLP layers under `Dense`, `Dense+Mask` (DST rewiring), and
+`SNACK` (sparse kernel + DST). Records per-step training loss, CUDA time,
+power, energy, memory, and inference latency / energy / perplexity at batch
+size 1.
+
+```bash
+pip install transformers datasets pynvml
+
+python experiments/gpt2_dst_lm_benchmark/run_gpt2_dst_snack_benchmark.py \
+  --model-name gpt2-large \
+  --dataset-name wikitext --dataset-config wikitext-2-raw-v1 \
+  --sparsity 0.90 --initial-sparsity 0.50 --sparsity-ramp-steps 500 \
+  --dst-interval 100 --dst-zeta 0.05 \
+  --lr 5e-5 --train-batch-size 1 --eval-batch-size 1 --block-size 128 \
+  --max-train-steps 500 --max-eval-batches 100 \
+  --perplexity-eval-interval 50 --perplexity-eval-batches 10 \
+  --target-perplexity 30 \
+  --snack-backend sparse_tensor \
+  --variants dense dense_mask snack \
+  --inference-warmup 50 --inference-steps 500 \
+  --output-dir experiments/gpt2_dst_lm_benchmark/results/gpt2_large
+```
+
+To use the Sputnik backend (`--snack-backend sputnik`) you must build the
+extension first:
+
+```bash
+bash benchmark/sparse_matrix_multi/install_sputnik_torch.sh
+export PYTHONPATH="$PWD/benchmark/sparse_matrix_multi/sputnik_torch_ext:$PYTHONPATH"
+```
+
+Model-size sweep used for the crossover curve in the appendix:
+
+```bash
+for size in gpt2 gpt2-medium gpt2-large gpt2-xl; do
+  python experiments/gpt2_dst_lm_benchmark/run_gpt2_dst_snack_benchmark.py \
+    --model-name "$size" \
+    --output-dir "experiments/gpt2_dst_lm_benchmark/results/${size//-/_}"
+done
+```
+
+A from-scratch (random-init) variant lives next to it:
+
+```bash
+python experiments/gpt2_dst_lm_benchmark/run_gpt2_dst_snack_from_scratch_benchmark.py \
+  --model-size gpt2 --tokenizer-name gpt2 \
+  --sparsity 0.90 --dst-interval 100 --dst-zeta 0.05 \
+  --output-dir experiments/gpt2_dst_lm_benchmark/results/gpt2_from_scratch
+```
+
+Each run writes `training_step_metrics.csv`, `inference_metrics.csv`,
+`table_a_training_efficiency.csv`, and `table_b_inference_batch1.csv`
+under `--output-dir/run_<hash>/` (use `--disable-output-hash` to write
+directly into `--output-dir`). See `experiments/gpt2_dst_lm_benchmark/README.md`
+for the long-run WT103 recipe and append-mode usage.
+
+## 4) GAMLP + SNACK (Table `tab:gamlp_training_compact`)
+
+GAMLP is a git submodule; pull it before running:
+
+```bash
+git submodule update --init --recursive
+pip install ogb torch-geometric dgl pynvml numpy
+```
+
+Train GAMLP (e.g. on `ogbn-products`):
+
+```bash
+python third_party/GAMLP/main.py \
+  --dataset ogbn-products --method R_GAMLP \
+  --stages 300 --train-num-epochs 0 \
+  --hidden 1024 --n-layers-1 4 --n-layers-2 4 --num-hops 5 \
+  --batch-size 50000 --pre-process --residual --bns
+```
+
+Benchmark inference at batch size 1 across `dense / dense_mask / snack`:
+
+```bash
+python experiments/gamlp_snack_benchmark/benchmark_gamlp_snack.py \
+  --checkpoint-path third_party/GAMLP/output/ogbn-products/<your_stage0>.pkl \
+  --dataset ogbn-products --method R_GAMLP \
+  --variants dense dense_mask snack \
+  --hidden 1024 --num-hops 5 --n-layers-1 4 --n-layers-2 4 \
+  --batch-size 1 --num-samples 1000 --warmup 100 \
+  --sparsities 0.70 0.80 0.90 0.95 0.99
+```
+
+Train all three variants (with optional DST prune/grow on `snack` /
+`dense_mask`) and log per-epoch speed/energy/memory metrics:
+
+```bash
+python experiments/gamlp_snack_benchmark/train_gamlp_snack_dst.py \
+  --dataset ogbn-products --method R_GAMLP_RLU --use-rlu \
+  --root third_party/GAMLP/data \
+  --hidden 512 --num-hops 5 --n-layers-1 2 --n-layers-2 2 --n-layers-3 2 \
+  --batch-size 4096 --epochs 40 \
+  --sparsity 0.90 --dst-zeta 0.05 --dst-every 5 --dst-until-epoch 25 \
+  --output-checkpoint experiments/gamlp_snack_benchmark/results/gamlp_snack_dst_checkpoint.pt \
+  --metrics-csv      experiments/gamlp_snack_benchmark/results/gamlp_snack_dst_training_metrics.csv
+```
+
+Replace `--variant snack` with `dense` or `dense_mask` for the corresponding
+baselines. Full options (RLU checkpoints, artifact-based mask→snack
+inference, etc.) are documented in `experiments/gamlp_snack_benchmark/README.md`.
+
+## 5) DST training curves (Figure 4, Appendix Figs 1–6)
+
+```bash
+python -m train.DST.train
+```
+
+Then open `DST/plots and stats.ipynb` to regenerate the figures from the
+logged outputs.
+
+## 6) Generating the paper-ready tables
+
+Once the SpMM CSVs and the GPT-2 / GAMLP result directories are populated,
+build all CSV/LaTeX tables in one step:
+
+```bash
+python benchmark/generate_paper_tables.py \
+  --gpt2-results-dir experiments/gpt2_dst_lm_benchmark/results \
+  --spmm-glob "benchmark/apr-13-log_mult_incl_cupy-test_*.csv" \
+  --output-dir benchmark/generated_tables
+```
+
+This writes one `.csv` and one `.tex` per table plus a combined
+`all_tables.tex` that mirrors the tables included in the paper.
+
+
 # Installation
 
 ## Prerequisites

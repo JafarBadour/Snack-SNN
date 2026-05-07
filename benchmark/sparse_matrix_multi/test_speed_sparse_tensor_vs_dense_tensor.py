@@ -18,6 +18,10 @@ from benchmark.sparse_matrix_multi.__test_methods import (
     test_sparse_torch_csr,
     test_flashsparse,
     test_sputnik,
+    test_cusparse_csr_library,
+    test_cusparse_coo_library,
+    test_sputnik_csr_dl_optimized,
+    test_ge_spmm_dgsparse_csr_gnn_optimized,
 )
 
 TESTING_DEVICE = "cuda"  # "cuda"
@@ -40,7 +44,9 @@ dense_levels = {
     "7500x7500": {"Reps": 2},
     "8500x8500": {"Reps": 2},
     "10000x10000" : {'Reps' : 2},
-    # "15000x15000" : {'Reps' : 2},
+    "12500x12500": {"Reps": 2},
+    "15000x15000": {"Reps": 2},
+    "17500x17500": {"Reps": 2},
 }
 
 csv_name = "apr-13-log_mult_incl_cupy"
@@ -65,7 +71,18 @@ method_dict = dict(
     test_sparse_torch_csr=test_sparse_torch_csr,
     test_flashsparse=test_flashsparse,
     test_sputnik=test_sputnik,
+    test_cusparse_csr_library=test_cusparse_csr_library,
+    test_cusparse_coo_library=test_cusparse_coo_library,
+    test_sputnik_csr_dl_optimized=test_sputnik_csr_dl_optimized,
+    test_ge_spmm_dgsparse_csr_gnn_optimized=test_ge_spmm_dgsparse_csr_gnn_optimized,
 )
+
+
+def is_oom_error(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    return "out of memory" in msg or "cuda error: out of memory" in msg
+
+
 def benchmark(method_name : str):
     log = []
     for BATCH_SIZE in tqdm(batches_cnt, desc="Batches processing"):
@@ -73,27 +90,27 @@ def benchmark(method_name : str):
             layera, layerb = list(map(int, dense_level.split("x")))
 
             for sparsity_level in tqdm(sparsity_levels, desc="Sparsity Lvls", leave=False):
-
-                ones = torch.rand((BATCH_SIZE, layera)).to(TESTING_DEVICE)
-
-                sparse_matrix = create_random_sparse_matrix(layera, layerb, sparsity_level)
-                sparse_matrix = sparse_matrix.to(TESTING_DEVICE)
-                kwargs = dict(
-                    log=log,
-                    sparse_matrix=sparse_matrix,
-                    layera=layera,
-                    layerb=layerb,
-                    ones=ones,
-                    sparsity_level=sparsity_level,
-                    dense_level=dense_level,
-                    reps=dense_levels[dense_level]["Reps"],
-                    batsh_sz=BATCH_SIZE,
-                )
                 caller : typing.Callable = method_dict[method_name]
                 try:
+                    ones = torch.rand((BATCH_SIZE, layera)).to(TESTING_DEVICE)
+                    sparse_matrix = create_random_sparse_matrix(layera, layerb, sparsity_level)
+                    sparse_matrix = sparse_matrix.to(TESTING_DEVICE)
+                    kwargs = dict(
+                        log=log,
+                        sparse_matrix=sparse_matrix,
+                        layera=layera,
+                        layerb=layerb,
+                        ones=ones,
+                        sparsity_level=sparsity_level,
+                        dense_level=dense_level,
+                        reps=dense_levels[dense_level]["Reps"],
+                        batsh_sz=BATCH_SIZE,
+                    )
                     caller(**kwargs)
                 except Exception as e:
                     print(e)
+                    if is_oom_error(e) and TESTING_DEVICE.startswith("cuda"):
+                        torch.cuda.empty_cache()
                     continue
 
                 df = pd.DataFrame(log)

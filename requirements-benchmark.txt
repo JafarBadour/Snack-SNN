@@ -1,0 +1,14 @@
+# Additional dependencies for running benchmarks and comparisons
+# These are optional and may require specific CUDA/CuDNN versions
+
+# JAX for sparse matrix benchmark comparisons
+jax>=0.4.0
+jaxlib>=0.4.0
+
+# CuPy for GPU sparse operations (requires CUDA 12.x)
+cupy-cuda12x>=13.3.0
+
+# spconv for sparse convolution comparisons (optional, complex installation)
+# Note: spconv installation requires specific CUDA setup
+# See: https://github.com/traveller59/spconv
+# spconv>=2.3.0

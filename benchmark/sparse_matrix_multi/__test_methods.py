@@ -18,6 +18,7 @@ import scipy.sparse as sp
 _flashsparse_modules = None
 _sputnik_module = None
 _SPUTNIK_LIB = None
+_gespmm_module = None
 
 
 def _prepend_sys_path(p: str) -> None:
@@ -104,6 +105,37 @@ def _get_sputnik_torch_ext():
 
     _sputnik_module = sputnik_torch_ext
     return _sputnik_module
+
+
+def _get_gespmm_module():
+    """
+    Lazy import for GE-SpMM style CUDA extension (module names seen in forks:
+    GESpMM_kernel / GESPMM). Requires the extension to be prebuilt.
+    """
+    global _gespmm_module
+    if _gespmm_module is not None:
+        return _gespmm_module
+
+    repo_root = Path(__file__).resolve().parents[2]
+    for rel in (
+        "third_party/FlashSparse/Baseline/GESpMM",
+        "experiments/spmm_exps/flashsparse/third_party/flashsparse/Baseline/GESpMM",
+    ):
+        _prepend_sys_path(str((repo_root / rel).resolve()))
+
+    for name in ("GESpMM_kernel", "GESPMM"):
+        try:
+            mod = __import__(name)
+            _gespmm_module = mod
+            return mod
+        except ImportError:
+            continue
+
+    raise ImportError(
+        "GE-SpMM extension not importable (GESpMM_kernel / GESPMM).\n"
+        "Build it first (example):\n"
+        "  cd third_party/FlashSparse/Baseline/GESpMM && python setup.py build_ext --inplace"
+    )
 
 
 def _load_sputnik_python_lib():
@@ -384,6 +416,7 @@ def test_sparse_torch(
     reps,
     batsh_sz,
     csr=False,
+    label="SparseTorch",
 ):
     indices = torch.concat(
         (
@@ -420,7 +453,7 @@ def test_sparse_torch(
 
         log.append(
             {
-                "isSparse": "SparseTorch",
+                "isSparse": label,
                 "dense_level": dense_level,
                 "sparsity_level": sparsity_level,
                 "time": t2 - t1,
@@ -731,6 +764,7 @@ def test_sputnik(
     dense_level,
     reps,
     batsh_sz,
+    label="Sputnik",
 ):
     """
     Sputnik SpMM via local torch extension.
@@ -782,7 +816,7 @@ def test_sputnik(
         elapsed_time_ms = start_event.elapsed_time(end_event)
         log.append(
             {
-                "isSparse": "Sputnik",
+                "isSparse": label,
                 "dense_level": dense_level,
                 "sparsity_level": sparsity_level,
                 "time": t2 - t1,
@@ -791,4 +825,86 @@ def test_sputnik(
                 "batch_size": batsh_sz,
             }
         )
+
+
+def test_cusparse_csr_library(**kwargs):
+    kwargs["csr"] = True
+    kwargs["label"] = "cuSPARSE CSRCSR Library"
+    test_sparse_torch(**kwargs)
+    kwargs["csr"] = False
+
+
+def test_cusparse_coo_library(**kwargs):
+    kwargs["csr"] = False
+    kwargs["label"] = "cuSPARSE COOCOO Library"
+    test_sparse_torch(**kwargs)
+
+
+def test_sputnik_csr_dl_optimized(**kwargs):
+    kwargs["label"] = "Sputnik CSR DL-optimized"
+    test_sputnik(**kwargs)
+
+
+def test_ge_spmm_dgsparse_csr_gnn_optimized(
+    log: list,
+    sparse_matrix: SparseTensor,
+    layera: int,
+    layerb: int,
+    ones: torch.Tensor,
+    sparsity_level,
+    dense_level,
+    reps,
+    batsh_sz,
+):
+    """
+    GE-SpMM / dgSPARSE CSR GNN-style baseline path.
+    Requires a built GE-SpMM extension module (GESpMM_kernel or GESPMM).
+    """
+    gespmm_mod = _get_gespmm_module()
+
+    row = sparse_matrix.indices_b.int().cpu().numpy()
+    col = sparse_matrix.indices_a.int().cpu().numpy()
+    data = sparse_matrix.values.float().cpu().numpy()
+    m, k = layerb, layera
+    csr = sp.csr_matrix((data, (row, col)), shape=(m, k))
+
+    row_offsets = torch.from_numpy(np.ascontiguousarray(csr.indptr.astype(np.int32))).cuda()
+    column_indices = torch.from_numpy(np.ascontiguousarray(csr.indices.astype(np.int32))).cuda()
+    values = torch.from_numpy(np.ascontiguousarray(csr.data.astype(np.float32))).cuda()
+    rhs = ones.detach().float().transpose(0, 1).contiguous()
+    nnz = int(values.numel())
+
+    # warmup
+    _ = gespmm_mod.forward(row_offsets, column_indices, values, rhs, m, batsh_sz, nnz, 1, 1)
+
+    for rep in tqdm(list(range(reps)), desc="Reps GE-SpMM/dgSPARSE", leave=False):
+        start_event = torch.cuda.Event(enable_timing=True)
+        end_event = torch.cuda.Event(enable_timing=True)
+        torch.cuda.synchronize()
+        start_event.record()
+        t1 = time.time()
+        for _ in range(100):
+            out = gespmm_mod.forward(
+                row_offsets, column_indices, values, rhs, m, batsh_sz, nnz, 1, 1
+            )
+            # forward may return tuple/list; normalize first tensor if needed
+            if isinstance(out, (tuple, list)) and len(out) > 0:
+                out0 = out[0]
+                _ = out0 / (out0.abs().max().clamp(min=1e-8))
+        t2 = time.time()
+        end_event.record()
+        torch.cuda.synchronize()
+        elapsed_time_ms = start_event.elapsed_time(end_event)
+        log.append(
+            {
+                "isSparse": "GE-SpMM / dgSPARSE CSR GNN-optimized",
+                "dense_level": dense_level,
+                "sparsity_level": sparsity_level,
+                "time": t2 - t1,
+                "cuda_elapsed_time": elapsed_time_ms,
+                "rep": rep,
+                "batch_size": batsh_sz,
+            }
+        )
+
 

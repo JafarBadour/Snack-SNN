@@ -2,8 +2,169 @@
 #include <vector>
 #include <iostream>
 #include <unordered_map>
+#include <algorithm>
+#include <cstdlib>
+#include <string>
+#include <cstdint>
+#include <limits>
+#include <cuda_runtime.h>
 using namespace std;
 const int MAX_THREADS = 1024;
+
+__global__ void sparse_multiply_kernel(
+    const float* activations, int nnz1, int nnz1_2,
+    const float* sparse_matrix_values, int nnz2,
+    const unsigned short* sparse_matrix_indices_a,
+    const unsigned short* sparse_matrix_indices_b, int nnz3,
+    float* output_values, int sparseCols);
+
+namespace {
+
+std::unordered_map<uint64_t, int> g_threads_cache;
+
+inline int nearest_bucket(int v, int min_bucket, int max_bucket) {
+    int b = min_bucket;
+    while (b < v && b < max_bucket) b <<= 1;
+    return std::min(std::max(b, min_bucket), max_bucket);
+}
+
+inline bool autotune_enabled() {
+    const char* env = std::getenv("SNACK_AUTOTUNE");
+    if (env == nullptr) return true;
+    return std::string(env) != "0";
+}
+
+inline bool autotune_verbose() {
+    const char* env = std::getenv("SNACK_AUTOTUNE_VERBOSE");
+    return env != nullptr && std::string(env) == "1";
+}
+
+inline int parse_threads_override() {
+    const char* env = std::getenv("SNACK_THREADS");
+    if (env == nullptr) return -1;
+    const int v = std::atoi(env);
+    if (v == 128 || v == 256 || v == 512 || v == 1024) return v;
+    return -1;
+}
+
+inline int default_threads_for_device() {
+    int device = 0;
+    cudaGetDevice(&device);
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, device);
+    // Hopper/Ada/Ampere usually likes 256-512 here.
+    if (prop.major >= 9) return 512;
+    if (prop.major >= 8) return 512;
+    return 256;
+}
+
+inline uint64_t make_cache_key(int device, int nnz_bucket, int batch_bucket) {
+    return (static_cast<uint64_t>(device & 0xFFFF) << 48) |
+           (static_cast<uint64_t>(nnz_bucket & 0xFFFFFF) << 24) |
+           static_cast<uint64_t>(batch_bucket & 0xFFFFFF);
+}
+
+float benchmark_threads_candidate(
+    int threads,
+    const float* activations, int nnz1, int nnz1_2,
+    const float* sparse_matrix_values, int nnz2,
+    const unsigned short* sparse_matrix_indices_a,
+    const unsigned short* sparse_matrix_indices_b, int nnz3,
+    int sparseCols,
+    torch::Tensor output_scratch
+) {
+    dim3 blocks((nnz2 + threads - 1) / threads, nnz1);
+
+    // Warmup launch.
+    sparse_multiply_kernel<<<blocks, threads>>>(
+        activations, nnz1, nnz1_2,
+        sparse_matrix_values, nnz2,
+        sparse_matrix_indices_a, sparse_matrix_indices_b, nnz3,
+        output_scratch.data_ptr<float>(), sparseCols
+    );
+    cudaDeviceSynchronize();
+
+    cudaEvent_t start, end;
+    cudaEventCreate(&start);
+    cudaEventCreate(&end);
+    cudaEventRecord(start);
+    for (int i = 0; i < 5; ++i) {
+        sparse_multiply_kernel<<<blocks, threads>>>(
+            activations, nnz1, nnz1_2,
+            sparse_matrix_values, nnz2,
+            sparse_matrix_indices_a, sparse_matrix_indices_b, nnz3,
+            output_scratch.data_ptr<float>(), sparseCols
+        );
+    }
+    cudaEventRecord(end);
+    cudaEventSynchronize(end);
+    float ms = 0.0f;
+    cudaEventElapsedTime(&ms, start, end);
+    cudaEventDestroy(start);
+    cudaEventDestroy(end);
+    return ms / 5.0f;
+}
+
+int resolve_threads_for_sparse_multiply(
+    int nnz1,
+    int nnz2,
+    int sparseCols,
+    const float* activations,
+    int nnz1_2,
+    const float* sparse_matrix_values,
+    const unsigned short* sparse_matrix_indices_a,
+    const unsigned short* sparse_matrix_indices_b,
+    int nnz3,
+    torch::Tensor output_template
+) {
+    const int override_threads = parse_threads_override();
+    if (override_threads > 0) return override_threads;
+
+    int device = 0;
+    cudaGetDevice(&device);
+    const int nnz_bucket = nearest_bucket(nnz2, 1024, 1 << 20);
+    const int batch_bucket = nearest_bucket(nnz1, 1, 256);
+    const uint64_t key = make_cache_key(device, nnz_bucket, batch_bucket);
+
+    auto it = g_threads_cache.find(key);
+    if (it != g_threads_cache.end()) return it->second;
+
+    int selected = default_threads_for_device();
+    if (autotune_enabled()) {
+        const int candidates[] = {128, 256, 512, 1024};
+        float best_ms = std::numeric_limits<float>::max();
+        int best_threads = selected;
+        for (int t : candidates) {
+            if (t > MAX_THREADS) continue;
+            torch::Tensor scratch = torch::zeros_like(output_template);
+            float ms = benchmark_threads_candidate(
+                t,
+                activations, nnz1, nnz1_2,
+                sparse_matrix_values, nnz2,
+                sparse_matrix_indices_a, sparse_matrix_indices_b, nnz3,
+                sparseCols,
+                scratch
+            );
+            if (ms < best_ms) {
+                best_ms = ms;
+                best_threads = t;
+            }
+        }
+        selected = best_threads;
+        if (autotune_verbose()) {
+            std::cout << "[SNACK autotune] device=" << device
+                      << " nnz_bucket=" << nnz_bucket
+                      << " batch_bucket=" << batch_bucket
+                      << " selected_threads=" << selected
+                      << std::endl;
+        }
+    }
+    g_threads_cache[key] = selected;
+    return selected;
+}
+
+}  // namespace
+
 __global__ void sparse_multiply_kernel(
     const float* activations, int nnz1, int nnz1_2,
     const float* sparse_matrix_values, int nnz2,
@@ -55,8 +216,18 @@ torch::Tensor sparse_multiply_cuda(
     int nnz2 = sparse_matrix_indices_a.size(0);
     int nnz3 = sparse_matrix_values.size(0);
 
-    const int threads = MAX_THREADS; // this was 256
-    //const int blocks = (nnz2 + threads - 1) / threads;
+    const int threads = resolve_threads_for_sparse_multiply(
+        nnz1,
+        nnz2,
+        static_cast<int>(sparseCols),
+        activations.data_ptr<float>(),
+        nnz1_2,
+        sparse_matrix_values.data_ptr<float>(),
+        sparse_matrix_indices_a.data_ptr<unsigned short>(),
+        sparse_matrix_indices_b.data_ptr<unsigned short>(),
+        nnz3,
+        output_values
+    );
     dim3 blocks((nnz2 + threads - 1) / threads, nnz1);
     // std::cout<< activations << ' ' << sparse_matrix_indices << ' ' << sparse_matrix_values << std::endl;
     sparse_multiply_kernel<<<blocks, threads>>>(
@@ -134,6 +305,17 @@ torch::Tensor sparse_outer_product_multiply_cuda(
     torch::Tensor left, torch::Tensor indices_left, torch::Tensor right,
     torch::Tensor indices_right) {
 
+    // Computes the per-(indices_left[k], indices_right[k]) sum over the batch
+    // axis of left and right:
+    //   output[k] = sum_b left[b, indices_left[k]] * right[b, indices_right[k]]
+    //
+    // This is exactly d L / d W[indices_a[k], indices_b[k]] for a linear layer
+    // Y = X @ W when called as sparse_outer_join(grad_Y, indices_b, X, indices_a).
+    // The chain rule already absorbs any mean-reduction in dL/dY, so we must
+    // NOT divide by batch_sz here. Doing so would shrink the weight gradient by
+    // an extra 1/B factor and silently undertrain the SNACK weights relative
+    // to a Dense+Mask reference.
+
     int max_len = std::max(indices_left.size(0), indices_right.size(0));
     auto output_values = torch::zeros({max_len}, torch::dtype(torch::kFloat32).device(torch::kCUDA));
     int batch_sz = left.size(0);
@@ -141,7 +323,6 @@ torch::Tensor sparse_outer_product_multiply_cuda(
     const int threads = MAX_THREADS; // this was 256
     dim3 blocks((max_len + threads - 1) / threads, batch_sz);
 
-    // std::cout<< activations << ' ' << sparse_matrix_indices << ' ' << sparse_matrix_values << std::endl;
     sparse_outer_product_multiply_kernel<<<blocks, threads>>>(
         left.data_ptr<float>(), left.size(1),
         indices_left.data_ptr<unsigned short>(),
@@ -150,7 +331,6 @@ torch::Tensor sparse_outer_product_multiply_cuda(
         output_values.data_ptr<float>(),
         max_len
         );
-    output_values = output_values / (batch_sz);
     return output_values;
 }
 

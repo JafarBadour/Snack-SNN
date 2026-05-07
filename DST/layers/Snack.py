@@ -66,6 +66,75 @@ class SparseFunc(Function):
         return grad_input, None, None, grad_values, grad_bias, None, None
 
 
+class SputnikSnackFunc(Function):
+    @staticmethod
+    def forward(
+        ctx,
+        input_2d,
+        indices_a,
+        indices_b,
+        values,
+        bias,
+        row_indices,
+        row_offsets,
+        column_indices,
+        value_order,
+        input_shape,
+        output_shape,
+        sputnik_mod,
+    ):
+        rhs = input_2d.transpose(0, 1).contiguous().to(dtype=torch.float32)
+        values_sorted = values.index_select(0, value_order).to(dtype=torch.float32)
+        out_t = sputnik_mod.spmm(
+            row_indices,
+            values_sorted,
+            row_offsets,
+            column_indices,
+            rhs,
+        )
+        output = out_t.transpose(0, 1).contiguous() + bias
+
+        ctx.save_for_backward(input_2d, indices_a, indices_b, values, bias)
+        ctx.input_shape = int(input_shape)
+        ctx.output_shape = int(output_shape)
+        return output
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        input_2d, indices_a, indices_b, values, bias = ctx.saved_tensors
+        grad_input = None
+        grad_bias = None
+        grad_values = None
+
+        sparse_tensor = SparseTensor(
+            indices_a=indices_a,
+            indices_b=indices_b,
+            values=values,
+            matrix_shape=(ctx.input_shape, ctx.output_shape),
+        )
+        if ctx.needs_input_grad[0]:
+            grad_input = sparse_tensor.t() @ grad_output
+        if ctx.needs_input_grad[3]:
+            grad_values = sparse_outer_join(grad_output, indices_b, input_2d, indices_a)
+        if ctx.needs_input_grad[4]:
+            grad_bias = grad_output.sum(dim=0)
+
+        return (
+            grad_input,
+            None,
+            None,
+            grad_values,
+            grad_bias,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+
+
 class Snack(torch.nn.Module):
     def __init__(
         self,

@@ -92,12 +92,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--use-rlu", action="store_true", default=True)
     parser.add_argument("--root", type=str, default="third_party/GAMLP/data")
     parser.add_argument("--hidden", type=int, default=512)
-    parser.add_argument(
-        "--hidden-scale",
-        type=float,
-        default=1.0,
-        help="Multiply hidden width by this factor (e.g., 5.0 => 5x larger MLP kernels where hidden is used).",
-    )
     parser.add_argument("--num-hops", type=int, default=5)
     parser.add_argument("--label-num-hops", type=int, default=9)
     parser.add_argument("--n-layers-1", type=int, default=2)
@@ -479,12 +473,6 @@ def main() -> None:
     if args.batch_size == 1 and args.bns:
         print("batch_size=1 is incompatible with BatchNorm in training; disabling BN (equivalent to --no-bns).")
         args.bns = False
-    if args.hidden_scale <= 0:
-        raise ValueError("--hidden-scale must be > 0.")
-    effective_hidden = max(1, int(round(args.hidden * args.hidden_scale)))
-    if effective_hidden != args.hidden:
-        print(f"Applying hidden scale: base_hidden={args.hidden} scale={args.hidden_scale} -> hidden={effective_hidden}")
-        args.hidden = effective_hidden
     torch.manual_seed(args.seed)
     args.output_checkpoint.parent.mkdir(parents=True, exist_ok=True)
     args.metrics_csv.parent.mkdir(parents=True, exist_ok=True)

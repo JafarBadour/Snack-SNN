@@ -1,0 +1,19 @@
+{
+  "name": "sparsegpt",
+  "repo_url": "https://github.com/IST-DASLab/sparsegpt",
+  "type": "mask",
+  "priority": 8,
+  "status": "in_progress",
+  "notes": "Build automated; benchmark uses upstream probe (mask generation benchmark path).",
+  "setup_commands": [
+    "bash scripts/setup.sh"
+  ],
+  "benchmark_commands": [
+    "bash scripts/run_microbench.sh"
+  ],
+  "expected_outputs": [
+    "results/*.csv",
+    "results/*.json",
+    "logs/*.log"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "smat",
+  "repo_url": "https://github.com/spcl/smat",
+  "type": "kernel",
+  "priority": 5,
+  "status": "in_progress",
+  "notes": "Build automated; benchmark uses upstream probe until local adapter is added.",
+  "setup_commands": [
+    "bash scripts/setup.sh"
+  ],
+  "benchmark_commands": [
+    "bash scripts/run_microbench.sh"
+  ],
+  "expected_outputs": [
+    "results/*.csv",
+    "results/*.json",
+    "logs/*.log"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "flashsparse",
+  "repo_url": "https://github.com/ParCIS/FlashSparse",
+  "type": "kernel",
+  "priority": 2,
+  "status": "in_progress",
+  "notes": "Integrated with benchmark/sparse_matrix_multi method test_flashsparse.",
+  "setup_commands": [
+    "bash scripts/setup.sh"
+  ],
+  "benchmark_commands": [
+    "bash scripts/run_microbench.sh"
+  ],
+  "expected_outputs": [
+    "results/*.csv",
+    "results/*.json",
+    "logs/*.log"
+  ],
+  "sparse_matrix_multi_method": "test_flashsparse"
+}

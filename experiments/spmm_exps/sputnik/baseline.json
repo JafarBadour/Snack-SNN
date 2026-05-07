@@ -1,0 +1,20 @@
+{
+  "name": "sputnik",
+  "repo_url": "https://github.com/google-research/sputnik",
+  "type": "kernel",
+  "priority": 1,
+  "status": "in_progress",
+  "notes": "Integrated with benchmark/sparse_matrix_multi method test_sputnik.",
+  "setup_commands": [
+    "bash scripts/setup.sh"
+  ],
+  "benchmark_commands": [
+    "bash scripts/run_microbench.sh"
+  ],
+  "expected_outputs": [
+    "results/*.csv",
+    "results/*.json",
+    "logs/*.log"
+  ],
+  "sparse_matrix_multi_method": "test_sputnik"
+}

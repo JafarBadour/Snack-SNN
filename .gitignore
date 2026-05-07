@@ -2,3 +2,15 @@
 .env
 *.csv
 *.pt
+*.pyc
+venv/*
+*venv/
+*.json
+*.pdf
+*.tex
+*.png
+*.sty
+*.logexperiments/spmm_exps/*/third_party/
+experiments/spmm_exps/*/logs/
+experiments/spmm_exps/*/results/
+experiments/spmm_exps/*/checkpoints/

@@ -1,0 +1,19 @@
+{
+  "name": "rigl",
+  "repo_url": "https://github.com/google-research/rigl",
+  "type": "mask",
+  "priority": 9,
+  "status": "in_progress",
+  "notes": "Build automated; benchmark uses upstream probe (training benchmark path).",
+  "setup_commands": [
+    "bash scripts/setup.sh"
+  ],
+  "benchmark_commands": [
+    "bash scripts/run_microbench.sh"
+  ],
+  "expected_outputs": [
+    "results/*.csv",
+    "results/*.json",
+    "logs/*.log"
+  ]
+}

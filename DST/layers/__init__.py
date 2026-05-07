@@ -1,2 +1,2 @@
-from DST.layers.Snack import Snack
+from DST.layers.Snack import Snack, SputnikSnackFunc
 from DST.layers.Dense import MaskedDense

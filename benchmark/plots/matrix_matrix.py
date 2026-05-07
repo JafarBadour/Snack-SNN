@@ -2,6 +2,7 @@ import seaborn as sns
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import to_hex
 
 # Default colors for paper-style legends (extended with tab20 for unknown types).
 _PAPER_TYPE_ORDER = [
@@ -14,6 +15,34 @@ _PAPER_TYPE_ORDER = [
     "CuPy Sparse CSR",
     "Sputnik",
 ]
+
+# Keep historical paper colors stable across notebook reruns.
+# Matches the palette shown in prior "SpMM vs DenseMM" figures.
+_FIXED_TYPE_COLORS = {
+    "DenseMM": "#8c564b",              # brown
+    "Dense": "#8c564b",
+    "SNACK-COO": "#ff7f0e",            # orange
+    "SpMM_COO(Snack)": "#ff7f0e",
+    "SpMM_COO(Cupy)": "#2ca02c",       # green
+    "SpMM_CSR(Cupy)": "#d62728",       # red
+    "SpMM_CSR(Torch)": "#9467bd",      # purple
+    "SpMM_BSR(Jax)": "#7f7f7f",        # gray
+    "SpMM_COO(Torch)": "#e377c2",      # pink
+    "DenseMM+Mask": "#1f3a93",         # dark blue
+    "Dense+Mask": "#1f3a93",
+    # Newer backends (explicitly separated from legacy colors above)
+    "SpMM_COO(Sputnik)": "#17becf",            # cyan
+    "SpMM_CSR(Sputnik DL-opt)": "#bcbd22",     # olive
+    "SpMM_COO(cuSPARSE)": "#aec7e8",           # light blue
+    "SpMM_CSR(cuSPARSE)": "#ffbb78",           # light orange
+    "SpMM_FlashSparse": "#98df8a",             # light green
+}
+
+
+def _distinct_fallback_colors():
+    """Fallback palette for unknown methods, excluding already fixed colors."""
+    fixed = {c.lower() for c in _FIXED_TYPE_COLORS.values()}
+    return [c for c in plt.cm.tab20.colors if to_hex(c).lower() not in fixed]
 
 
 def _type_color_map(types_present):
@@ -57,8 +86,15 @@ def plt_them(
         color_map["Dense+Mask"] = color_map.get("Dense+Mask", color_map.get("Dense", plt.cm.tab20.colors[0]))
         idx_map["Dense+Mask"] = idx_map.get("Dense+Mask", idx_map.get("Dense", 0))
     else:
-        colors = plt.cm.tab20.colors
-        color_map = {category: colors[i % len(colors)] for i, category in enumerate(categories)}
+        colors = _distinct_fallback_colors() or list(plt.cm.tab20.colors)
+        color_map = {}
+        used = 0
+        for category in categories:
+            if category in _FIXED_TYPE_COLORS:
+                color_map[category] = _FIXED_TYPE_COLORS[category]
+            else:
+                color_map[category] = colors[used % len(colors)]
+                used += 1
         idx_map = {category: i for i, category in enumerate(categories)}
 
         df_dlvl = df_dlvl[df_dlvl.Type.isin(categories)]

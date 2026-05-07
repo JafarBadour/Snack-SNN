@@ -1,0 +1,19 @@
+{
+  "name": "sparta",
+  "repo_url": "https://github.com/microsoft/SparTA",
+  "type": "kernel",
+  "priority": 10,
+  "status": "in_progress",
+  "notes": "Build automated; benchmark uses upstream probe until local adapter is added.",
+  "setup_commands": [
+    "bash scripts/setup.sh"
+  ],
+  "benchmark_commands": [
+    "bash scripts/run_microbench.sh"
+  ],
+  "expected_outputs": [
+    "results/*.csv",
+    "results/*.json",
+    "logs/*.log"
+  ]
+}
