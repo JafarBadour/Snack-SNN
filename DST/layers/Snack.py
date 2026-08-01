@@ -83,8 +83,13 @@ class SputnikSnackFunc(Function):
         output_shape,
         sputnik_mod,
     ):
-        rhs = input_2d.transpose(0, 1).contiguous().to(dtype=torch.float32)
-        values_sorted = values.index_select(0, value_order).to(dtype=torch.float32)
+        if input_2d.dtype != torch.float32 or values.dtype != torch.float32:
+            raise TypeError(
+                "Sputnik backend requires float32 input and values; "
+                "SNACK does not cast tensors implicitly"
+            )
+        rhs = input_2d.transpose(0, 1).contiguous()
+        values_sorted = values.index_select(0, value_order)
         out_t = sputnik_mod.spmm(
             row_indices,
             values_sorted,
@@ -147,7 +152,7 @@ class Snack(torch.nn.Module):
         initializer: typing.Type[SparseInitializer] = None,
         device="cuda",
         debug=False,
-
+        dtype: torch.dtype = torch.float32,
     ):
         """
 
@@ -156,13 +161,17 @@ class Snack(torch.nn.Module):
         :param sparsity:
         :param init: "uniform_initializer" or None
         :param device:
+        :param dtype: compute dtype for values/bias/activations (fp32/fp16/bf16)
         """
         super(Snack, self).__init__()
+        if dtype not in (torch.float32, torch.float16, torch.bfloat16):
+            raise TypeError("Snack dtype must be float32, float16, or bfloat16")
+        self.dtype = dtype
         self.size = (input_size, output_size)
         if bias:
-            self.bias = torch.randn(output_size).to(device).float()
+            self.bias = torch.randn(output_size, device=device, dtype=dtype)
         else:
-            self.bias = torch.zeros(output_size).to(device).float()
+            self.bias = torch.zeros(output_size, device=device, dtype=dtype)
 
         self.device = device
         if not (1 > sparsity >= 0):
@@ -178,6 +187,11 @@ class Snack(torch.nn.Module):
             raise TypeError("""initializer Must implement SparseInitializer""")
 
         if dense_weight is not None:
+            if dense_weight.dtype != dtype:
+                raise TypeError(
+                    f"dense_weight dtype {dense_weight.dtype} does not match "
+                    f"Snack dtype {dtype}"
+                )
             # Convert dense weight to sparse representation
             nonzero_indices = torch.nonzero(dense_weight, as_tuple=True)
             self.indices_a = nonzero_indices[0]
@@ -191,7 +205,24 @@ class Snack(torch.nn.Module):
         self.indices_b = torch.nn.Parameter(self.indices_b.to(device), requires_grad=False)
         if values is not None:
             self.values = values
-        self.values = self.values.to(device).float()
+        if self.values.dtype != dtype:
+            raise TypeError(
+                f"values dtype {self.values.dtype} does not match Snack dtype {dtype}"
+            )
+        target_device = torch.device(device)
+        if self.values.device.type != target_device.type:
+            raise ValueError(
+                f"values device {self.values.device} does not match "
+                f"Snack device {target_device}"
+            )
+        if (
+            target_device.index is not None
+            and self.values.device.index != target_device.index
+        ):
+            raise ValueError(
+                f"values device {self.values.device} does not match "
+                f"Snack device {target_device}"
+            )
         self.values = torch.nn.Parameter(self.values)
         self.bias = torch.nn.Parameter(self.bias)
         self.debug = debug
@@ -208,7 +239,7 @@ class Snack(torch.nn.Module):
         indices = init_cls__.initialize(in_features, out_features, sparsity=sparsity, device=self.device)
         indices_a, indices_b = indices[:, 0], indices[:, 1]
 
-        values = torch.randn(indices.size(0)).float()
+        values = torch.randn(indices.size(0), device=self.device, dtype=self.dtype)
         sp = SparseTensor(
             indices_a=indices_a,
             indices_b=indices_b,
@@ -218,6 +249,11 @@ class Snack(torch.nn.Module):
         return sp.indices_a, sp.indices_b, sp.values
 
     def forward(self, x):
+        if x.dtype != self.dtype:
+            raise TypeError(
+                f"input dtype {x.dtype} does not match Snack dtype {self.dtype}; "
+                "cast explicitly at the caller"
+            )
         return SparseFunc.apply(x, self.indices_a, self.indices_b, self.values, self.bias, self.size[0], self.size[1])
 
     def sparse_hash(self):
@@ -240,8 +276,8 @@ class Snack(torch.nn.Module):
         return self.__str__()
 
     def __del__(self):
-        del self.values
-        del self.indices_b
-        del self.indices_a
-        del self.bias
-        torch.cuda.empty_cache()  # Clears unreferenced memory (optional)
+        # Best-effort cleanup; torch may already be torn down at interpreter exit.
+        try:
+            torch.cuda.empty_cache()
+        except Exception:
+            pass

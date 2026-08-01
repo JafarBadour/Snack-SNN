@@ -3,12 +3,29 @@ import torch
 
 
 class MaskedDense(nn.Module):
-    def __init__(self, input_size, output_size, bias=True, activation=None, device="cuda", mask_enabled=True):
+    def __init__(
+        self,
+        input_size,
+        output_size,
+        bias=True,
+        activation=None,
+        device="cuda",
+        mask_enabled=True,
+        dtype=torch.float32,
+    ):
         super(MaskedDense, self).__init__()
-        self.linear = nn.Linear(input_size, output_size, bias=bias).to(device)  # Linear layer
-        self.weight_mask = torch.ones_like(self.linear.weight).to(device) # Initially all ones
+        self.linear = nn.Linear(
+            input_size,
+            output_size,
+            bias=bias,
+            device=device,
+            dtype=dtype,
+        )
+        self.weight_mask = torch.ones_like(self.linear.weight)
         if mask_enabled:
-            self.weight_mask = torch.nn.Parameter(self.weight_mask.to(device), requires_grad=False)
+            self.weight_mask = torch.nn.Parameter(
+                self.weight_mask, requires_grad=False
+            )
         self.weight_mask[0, :] = 0
         self.mask_enabled = mask_enabled
         self.activation = activation
