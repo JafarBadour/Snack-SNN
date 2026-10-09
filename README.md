@@ -1,3 +1,59 @@
+# SNACK: Sparse Network Active CUDA Kernel
+
+### Beyond Masked Sparsity: SNACK Enables Truly Sparse Neural Networks on GPU
+
+**Accepted at NeurIPS 2026** &nbsp;·&nbsp; Paris
+
+[![Paper](https://img.shields.io/badge/arXiv-2610.04093-b31b1b.svg)](https://arxiv.org/abs/2610.04093)
+[![Venue](https://img.shields.io/badge/NeurIPS-2026-68217a.svg)](https://neurips.cc/)
+[![Python](https://img.shields.io/badge/python-3.12%2B-3776ab.svg)](https://www.python.org/)
+[![CUDA](https://img.shields.io/badge/CUDA-12.1%20%7C%2012.4%20%7C%2012.6-76b900.svg)](https://developer.nvidia.com/cuda-toolkit)
+
+[Jafar Badour](https://jafarbadour.com), Maurice van Keulen, Elena Mocanu
+*University of Twente, The Netherlands*
+
+---
+
+Deep neural networks keep growing, and Dynamic Sparse Training (DST) promises to cut the
+cost — but most implementations are **binary masks over dense tensors**, which recover
+almost none of the theoretical compute, memory, or energy savings. The dense matmul still
+runs, and the dense weight matrix is still stored.
+
+**SNACK is a truly sparse GPU layer**: it stores and computes only non-zero connections.
+It exposes a PyTorch API for restructuring connections and backpropagating gradients
+entirely in the sparse paradigm, and ships **SNACK-COO**, a custom COO-format SpMM CUDA
+kernel with a batch-to-SM mapping tuned for the small-batch, high-sparsity regime typical
+of large-model training and single-stream inference.
+
+### Headline results
+
+| | Result |
+|---|---|
+| **Kernel** | Up to **7× faster** than masked-dense; competitive with cuSPARSE, Sputnik and FlashSparse at 95% sparsity |
+| **Single layer @ 90% sparsity** | **8×** / **3.7×** faster training and **4×** / **2×** faster inference vs. Dense+Mask / dense; **72% less memory** than dense |
+| **GPT-2 small DST** | Same perplexity as Dense+Mask with up to **40% less training memory**; inference at **2.2× less memory** (1256 → 579 MB) and **22% less energy/token** |
+| **GAMLP, `ogbn-products`, batch 1, η=0.99** | Latency 1.01 → **0.21 ms** (4.8×), memory 310 → **111 MB**, energy 51 → **10 mJ** |
+| **Correctness** | Gradients match Dense+Mask to 1e-4; RigL(SNACK) matches RigL on ImageNet |
+
+Drop-in for `nn.Linear`. Backend-agnostic — swap SNACK-COO, Sputnik, cuSPARSE or
+FlashSparse per regime while the gradient and initializer stay sparse.
+
+### Citation
+
+```bibtex
+@inproceedings{badour2026snack,
+  title     = {Beyond Masked Sparsity: {SNACK} Enables Truly Sparse Neural Networks on {GPU}},
+  author    = {Badour, Jafar and van Keulen, Maurice and Mocanu, Elena},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2026},
+  eprint    = {2610.04093},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.LG}
+}
+```
+
+---
+
 # Structure
 
 
@@ -359,11 +415,22 @@ export CUDA_HOME="$(dirname "$(dirname "$(which nvcc)")")"
 pip install -e sparse/mult --no-build-isolation
 ```
 
-# Set PyTorch library path (Linux)
-# Modify the path according to your Python installation
+Set the PyTorch library path (Linux) — adjust for your Python installation:
+
+```bash
 export LD_LIBRARY_PATH=$(python -c "import torch; import os; print(os.path.join(os.path.dirname(torch.__file__), 'lib'))"):$LD_LIBRARY_PATH
+```
 
-if you have the dataset on a remote server you can connect from it using the following command
+If the dataset lives on a remote server, forward a notebook port over SSH:
 
-```shell
-ssh -L 8888:localhost:8888 -p 2222 username@LINK
+```bash
+ssh -L 8888:localhost:8888 -p 2222 username@HOST
+```
+
+
+## Acknowledgements
+
+This work was supported by the Modular Integrated Sustainable Datacenter (MISD) project,
+funded by the Dutch Ministry of Economic Affairs and Climate under the European IPCEI-CIS
+programme. Jafar Badour is fully funded by the MISD project; Elena Mocanu is partially
+funded by the MISD project.

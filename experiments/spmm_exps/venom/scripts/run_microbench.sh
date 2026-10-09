@@ -2,7 +2,8 @@
 set -euo pipefail
 
 BASELINE="venom"
-ROOT_DIR="/home/jafar/Arts/Parallel-Dynamic-Sparse-Training"
+# Repo root: override with SNACK_ROOT, otherwise derived from this script's location.
+ROOT_DIR="${SNACK_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)}"
 BASELINE_DIR="$ROOT_DIR/experiments/spmm_exps/$BASELINE"
 LOG_DIR="$BASELINE_DIR/logs"
 RESULTS_DIR="$BASELINE_DIR/results"
