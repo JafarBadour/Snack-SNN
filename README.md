@@ -8,6 +8,7 @@
 [![Venue](https://img.shields.io/badge/NeurIPS-2026-68217a.svg)](https://neurips.cc/)
 [![Python](https://img.shields.io/badge/python-3.12%2B-3776ab.svg)](https://www.python.org/)
 [![CUDA](https://img.shields.io/badge/CUDA-12.1%20%7C%2012.4%20%7C%2012.6-76b900.svg)](https://developer.nvidia.com/cuda-toolkit)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 [Jafar Badour](https://jafarbadour.com), Maurice van Keulen, Elena Mocanu
 *University of Twente, The Netherlands*
@@ -427,6 +428,12 @@ If the dataset lives on a remote server, forward a notebook port over SSH:
 ssh -L 8888:localhost:8888 -p 2222 username@HOST
 ```
 
+
+## License
+
+Released under the [MIT License](LICENSE). The third-party submodules under
+`third_party/` (Sputnik, GAMLP) and the external baselines fetched by
+`experiments/spmm_exps/` carry their own licenses.
 
 ## Acknowledgements
 
